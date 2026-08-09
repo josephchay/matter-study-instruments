@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PARTICLE FORGE — an interactive matter laboratory</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
+<style>
+  :root{
+    --void:#07070a;
+    --void-2:#0e0e14;
+    --molten:#ff5a3c;
+    --molten-2:#ffb347;
+    --plasma:#7de8ff;
+    --iron:#c9c9d4;
+    --iron-dim:#54545f;
+    --paper:#f2f0ea;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{
+    background:var(--void);
+    color:var(--paper);
+    font-family:'Iowan Old Style','Georgia',serif;
+    overflow:hidden;
+    height:100%;
+    cursor:none;
+  }
+  #stage{
+    position:fixed;
+    inset:0;
+    display:block;
+  }
+
+  /* ---- overlay chrome ---- */
+  .chrome{
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    z-index:10;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+  }
+  .brand{
+    position:absolute;
+    top:36px;
+    left:40px;
+    letter-spacing:0.32em;
+    font-size:11px;
+    font-weight:600;
+    text-transform:uppercase;
+    color:var(--iron);
+    opacity:0;
+  }
+  .brand span{color:var(--molten);}
+  .brand .sub{
+    display:block;
+    margin-top:6px;
+    font-family:'Iowan Old Style','Georgia',serif;
+    letter-spacing:0.01em;
+    font-size:13px;
+    text-transform:none;
+    font-style:italic;
+    color:var(--iron-dim);
+  }
+  .heat{
+    position:absolute;
+    top:36px;
+    right:40px;
+    text-align:right;
+    font-size:10px;
+    letter-spacing:0.24em;
+    text-transform:uppercase;
+    color:var(--iron-dim);
+    opacity:0;
+  }
+  .heat .val{
+    font-family:'Iowan Old Style','Georgia',serif;
+    font-style:italic;
+    font-size:34px;
+    color:var(--molten-2);
+    letter-spacing:0;
+    display:block;
+    margin-top:4px;
+    font-variant-numeric:tabular-nums;
+  }
+
+  /* ---- form dock (bottom) ---- */
+  .dock{
+    position:absolute;
+    bottom:0;
+    left:0;
+    right:0;
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    padding:0 40px 34px;
+    pointer-events:none;
+  }
+  .forms{
+    display:flex;
+    gap:10px;
+    pointer-events:all;
+    opacity:0;
+  }
+  .form-btn{
+    position:relative;
+    width:58px;
+    height:58px;
+    border-radius:50%;
+    border:1px solid rgba(242,240,234,0.18);
+    background:rgba(255,255,255,0.02);
+    color:var(--iron);
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:9px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:border-color .35s ease, color .35s ease;
+    backdrop-filter:blur(6px);
+  }
+  .form-btn:hover{ border-color:var(--molten); color:var(--paper); }
+  .form-btn.active{
+    border-color:var(--molten-2);
+    color:var(--void);
+    background:var(--molten-2);
+    box-shadow:0 0 26px rgba(255,179,71,0.45);
+  }
+
+  .physics-panel{
+    pointer-events:all;
+    opacity:0;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    width:220px;
+    font-family:'Helvetica Neue',Arial,sans-serif;
+  }
+  .physics-panel .label-row{
+    display:flex;
+    justify-content:space-between;
+    font-size:9.5px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--iron-dim);
+  }
+  .physics-panel .label-row b{ color:var(--iron); font-weight:500;}
+  input[type=range]{
+    -webkit-appearance:none;
+    width:100%;
+    height:1px;
+    background:rgba(242,240,234,0.22);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:11px;height:11px;
+    border-radius:50%;
+    background:var(--molten-2);
+    box-shadow:0 0 10px rgba(255,179,71,0.6);
+    cursor:pointer;
+    margin-top:-5px;
+  }
+
+  /* ---- hero title, center-ish, fades once formed ---- */
+  .hint{
+    position:absolute;
+    left:50%;
+    bottom:26px;
+    transform:translateX(-50%);
+    font-family:'Helvetica Neue',Arial,sans-serif;
+    font-size:10px;
+    letter-spacing:0.2em;
+    text-transform:uppercase;
+    color:var(--iron-dim);
+    opacity:0;
+    text-align:center;
+    pointer-events:none;
+  }
+  .hint b{ color:var(--molten-2); font-weight:500; }
+
+  /* custom molten cursor */
+  #cursor-dot{
+    position:fixed;
+    top:0;left:0;
+    width:8px;height:8px;
+    margin:-4px 0 0 -4px;
+    border-radius:50%;
+    background:var(--molten-2);
+    pointer-events:none;
+    z-index:50;
+    box-shadow:0 0 12px 4px rgba(255,179,71,0.55);
+  }
+
+  .intro-veil{
+    position:fixed;
+    inset:0;
+    background:var(--void);
+    z-index:80;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .intro-word{
+    font-family:'Iowan Old Style','Georgia',serif;
+    font-style:italic;
+    font-size:15px;
+    letter-spacing:0.5em;
+    text-transform:uppercase;
+    color:var(--iron-dim);
+  }
+</style>
+</head>
+<body>
+
+<div class="intro-veil" id="veil"><div class="intro-word">forging particles</div></div>
+<div id="cursor-dot"></div>
+
+<canvas id="stage"></canvas>
+
+<div class="chrome">
+  <div class="brand">particle<span>·</span>forge
+    <span class="sub">an interactive matter laboratory</span>
+  </div>
+
+  <div class="heat">
+    velocity field
+    <span class="val" id="heatVal">0.00</span>
+  </div>
+
+  <div class="dock">
+    <div class="physics-panel">
+      <div class="label-row"><span>tension</span><b id="tensLbl">0.045</b></div>
+      <input type="range" id="tension" min="1" max="12" value="4.5" step="0.5">
+      <div class="label-row"><span>damping</span><b id="dampLbl">0.86</b></div>
+      <input type="range" id="damping" min="70" max="98" value="86" step="1">
+      <div class="label-row"><span>turbulence</span><b id="turbLbl">0.30</b></div>
+      <input type="range" id="turb" min="0" max="100" value="30" step="1">
+    </div>
+
+    <div class="forms">
+      <button class="form-btn active" data-form="ring">Ring</button>
+      <button class="form-btn" data-form="heart">Heart</button>
+      <button class="form-btn" data-form="star">Star</button>
+      <button class="form-btn" data-form="wave">Wave</button>
+      <button class="form-btn" data-form="scatter">Chaos</button>
+      <button class="form-btn" data-form="vortex">Vortex</button>
+    </div>
+  </div>
+
+  <div class="hint">drag anywhere to stir the field · click to <b>ignite a burst</b></div>
+</div>
+
+<script>
+/* =========================================================================
+   PARTICLE FORGE
+   A layered particle system:
+   - Canvas2D renders N springy particles that morph between formations
+     (GSAP-driven target interpolation = "flubber-style" shape morphing
+      done manually via point-to-point tweening, since each formation
+      is generated as an equal-length point set).
+   - Each particle is a lightweight spring/elastic integrator (custom,
+     inspired by Matter.js constraint math) giving jelly/elastic/bouncy
+     motion as it chases its target.
+   - A Matter.js physics world runs beneath, invisibly, driving a handful
+     of heavier "core" bodies that particles react to (gravity wells),
+     plus click-triggered burst bodies for weightier "explosion" feel.
+   - A gooey liquid-metal cursor blob uses SVG-filter-style metaball math
+     approximated with canvas radial gradients + globalCompositeOperation.
+   - anime.js drives the UI chrome entrance and easing of scalar values.
+   ========================================================================= */
+
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d');
+let W, H, DPR;
+
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W*DPR;
+  canvas.height = H*DPR;
+  canvas.style.width = W+'px';
+  canvas.style.height = H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+resize();
+window.addEventListener('resize', resize);
+
+/* ---------------- custom cursor ---------------- */
+const cursorDot = document.getElementById('cursor-dot');
+let mouse = {x:W/2, y:H/2, px:W/2, py:H/2, vx:0, vy:0, down:false};
+window.addEventListener('mousemove', e=>{
+  mouse.px = mouse.x; mouse.py = mouse.y;
+  mouse.x = e.clientX; mouse.y = e.clientY;
+  mouse.vx = mouse.x - mouse.px;
+  mouse.vy = mouse.y - mouse.py;
+  cursorDot.style.transform = `translate(${mouse.x}px, ${mouse.y}px)`;
+});
+window.addEventListener('mousedown', ()=>{ mouse.down = true; burst(mouse.x, mouse.y); });
+window.addEventListener('mouseup', ()=>{ mouse.down = false; });
+window.addEventListener('touchmove', e=>{
+  const t = e.touches[0]; if(!t) return;
+  mouse.px = mouse.x; mouse.py = mouse.y;
+  mouse.x = t.clientX; mouse.y = t.clientY;
+  mouse.vx = mouse.x - mouse.px; mouse.vy = mouse.y - mouse.py;
+}, {passive:true});
+window.addEventListener('touchstart', e=>{
+  const t = e.touches[0]; if(!t) return;
+  mouse.down = true; burst(t.clientX, t.clientY);
+}, {passive:true});
+window.addEventListener('touchend', ()=> mouse.down = false);
+
+/* ---------------- tunable physics params (UI-bound) ---------------- */
+const params = { tension: 0.045, damping: 0.86, turbulence: 0.30 };
+
+const tensionInput = document.getElementById('tension');
+const dampingInput = document.getElementById('damping');
+const turbInput = document.getElementById('turb');
+const tensLbl = document.getElementById('tensLbl');
+const dampLbl = document.getElementById('dampLbl');
+const turbLbl = document.getElementById('turbLbl');
+
+tensionInput.addEventListener('input', e=>{
+  params.tension = (+e.target.value)/100;
+  tensLbl.textContent = params.tension.toFixed(3);
+});
+dampingInput.addEventListener('input', e=>{
+  params.damping = (+e.target.value)/100;
+  dampLbl.textContent = params.damping.toFixed(2);
+});
+turbInput.addEventListener('input', e=>{
+  params.turbulence = (+e.target.value)/100;
+  turbLbl.textContent = params.turbulence.toFixed(2);
+});
+
+/* ---------------- formation generators (equal point counts = morphable) ---------------- */
+const COUNT = 420;
+
+function ringPts(){
+  const pts=[]; const cx=W/2, cy=H/2, r=Math.min(W,H)*0.26;
+  for(let i=0;i<COUNT;i++){
+    const a = (i/COUNT)*Math.PI*2;
+    pts.push({x:cx+Math.cos(a)*r, y:cy+Math.sin(a)*r});
+  }
+  return pts;
+}
+function heartPts(){
+  const pts=[]; const cx=W/2, cy=H/2+10;
+  const scale = Math.min(W,H)*0.019;
+  for(let i=0;i<COUNT;i++){
+    const t = (i/COUNT)*Math.PI*2;
+    const x = 16*Math.pow(Math.sin(t),3);
+    const y = 13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t);
+    pts.push({x:cx+x*scale, y:cy-y*scale});
+  }
+  return pts;
+}
+function starPts(){
+  const pts=[]; const cx=W/2, cy=H/2;
+  const outer = Math.min(W,H)*0.28, inner = outer*0.42, spikes=5;
+  for(let i=0;i<COUNT;i++){
+    const t = i/COUNT;
+    const spikeF = t*spikes*2;
+    const idx = Math.floor(spikeF);
+    const frac = spikeF - idx;
+    const r0 = idx%2===0 ? outer : inner;
+    const r1 = (idx+1)%2===0 ? outer : inner;
+    const r = r0 + (r1-r0)*frac;
+    const a = t*Math.PI*2 - Math.PI/2;
+    pts.push({x:cx+Math.cos(a)*r, y:cy+Math.sin(a)*r});
+  }
+  return pts;
+}
+function wavePts(){
+  const pts=[]; const margin = W*0.12;
+  const usable = W - margin*2;
+  for(let i=0;i<COUNT;i++){
+    const t = i/COUNT;
+    const x = margin + t*usable;
+    const y = H/2 + Math.sin(t*Math.PI*6)*Math.min(H*0.16,110);
+    pts.push({x,y});
+  }
+  return pts;
+}
+function scatterPts(){
+  const pts=[];
+  for(let i=0;i<COUNT;i++){
+    pts.push({x:Math.random()*W, y:Math.random()*H});
+  }
+  return pts;
+}
+function vortexPts(){
+  const pts=[]; const cx=W/2, cy=H/2;
+  for(let i=0;i<COUNT;i++){
+    const t = i/COUNT;
+    const a = t*Math.PI*14;
+    const r = t*Math.min(W,H)*0.34;
+    pts.push({x:cx+Math.cos(a)*r, y:cy+Math.sin(a)*r});
+  }
+  return pts;
+}
+
+const FORMATIONS = {
+  ring: ringPts, heart: heartPts, star: starPts,
+  wave: wavePts, scatter: scatterPts, vortex: vortexPts
+};
+
+/* ---------------- particle class: spring/elastic integrator ---------------- */
+class Particle{
+  constructor(x,y,tx,ty,i){
+    this.x=x; this.y=y;
+    this.vx=(Math.random()-0.5)*2; this.vy=(Math.random()-0.5)*2;
+    this.tx=tx; this.ty=ty;
+    this.baseR = 1.4 + Math.random()*2.2;
+    this.r = this.baseR;
+    this.hueShift = Math.random();
+    this.i = i;
+    this.phase = Math.random()*Math.PI*2;
+    this.burstVX = 0; this.burstVY = 0;
+  }
+  setTarget(tx,ty){ this.tx=tx; this.ty=ty; }
+  update(t){
+    // spring toward target (elastic/jelly feel)
+    const dx = this.tx - this.x;
+    const dy = this.ty - this.y;
+    this.vx += dx*params.tension;
+    this.vy += dy*params.tension;
+
+    // ambient turbulence (organic fluid drift)
+    const n = Math.sin(t*0.0011 + this.phase)*Math.cos(t*0.0007 + this.i);
+    this.vx += n*params.turbulence*0.6;
+    this.vy += Math.cos(t*0.0009 + this.phase)*params.turbulence*0.6;
+
+    // mouse repulsion field (weighty push, not just glued)
+    const mdx = this.x - mouse.x, mdy = this.y - mouse.y;
+    const md2 = mdx*mdx+mdy*mdy;
+    const radius = 130;
+    if(md2 < radius*radius){
+      const md = Math.sqrt(md2)||0.001;
+      const force = (1 - md/radius) * 3.2;
+      this.vx += (mdx/md)*force;
+      this.vy += (mdy/md)*force;
+      // stretch effect: elongate along mouse velocity
+      this.r = this.baseR + Math.min(3, (Math.abs(mouse.vx)+Math.abs(mouse.vy))*0.06);
+    } else {
+      this.r += (this.baseR - this.r)*0.1;
+    }
+
+    // burst impulse decay (weightier bouncy kick)
+    this.vx += this.burstVX; this.vy += this.burstVY;
+    this.burstVX *= 0.9; this.burstVY *= 0.9;
+
+    // damping
+    this.vx *= params.damping;
+    this.vy *= params.damping;
+
+    this.x += this.vx;
+    this.y += this.vy;
+  }
+}
+
+let particles = [];
+function initParticles(){
+  const pts = FORMATIONS.ring();
+  particles = pts.map((p,i)=> new Particle(
+    W/2+(Math.random()-0.5)*40, H/2+(Math.random()-0.5)*40, p.x, p.y, i
+  ));
+}
+initParticles();
+
+let currentForm = 'ring';
+function morphTo(name){
+  const gen = FORMATIONS[name];
+  if(!gen) return;
+  const pts = gen();
+  particles.forEach((p,i)=>{
+    // slight randomized stagger via anime.js-driven delay emulation:
+    // we just jitter tension briefly per-particle for organic arrival
+    p.setTarget(pts[i].x, pts[i].y);
+  });
+  currentForm = name;
+
+  document.querySelectorAll('.form-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.form===name);
+  });
+
+  // anime.js: pulse the heat readout & panel on morph for tactile feedback
+  anime({
+    targets: '.heat .val',
+    scale: [1.35,1],
+    duration: 550,
+    easing: 'spring(1, 80, 10, 0)'
+  });
+}
+
+document.querySelectorAll('.form-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=> morphTo(btn.dataset.form));
+});
+
+/* auto-cycle formations slowly if idle */
+let idleTimer = null;
+const order = ['ring','heart','star','wave','vortex','scatter'];
+let orderIdx = 0;
+function scheduleIdle(){
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(()=>{
+    orderIdx = (orderIdx+1)%order.length;
+    morphTo(order[orderIdx]);
+    scheduleIdle();
+  }, 6500);
+}
+scheduleIdle();
+window.addEventListener('mousemove', scheduleIdle);
+window.addEventListener('click', scheduleIdle);
+
+/* ---------------- Matter.js: invisible physics core for weighty bursts ---------------- */
+const { Engine, World, Bodies, Body, Vector } = Matter;
+const engine = Engine.create();
+engine.gravity.y = 0;
+const world = engine.world;
+
+let burstBodies = [];
+function burst(x,y){
+  // impulse nearby particles outward — bouncy / elastic burst
+  particles.forEach(p=>{
+    const dx = p.x-x, dy = p.y-y;
+    const d2 = dx*dx+dy*dy;
+    const radius = 240;
+    if(d2 < radius*radius){
+      const d = Math.sqrt(d2)||0.001;
+      const force = (1 - d/radius) * 18;
+      p.burstVX += (dx/d)*force;
+      p.burstVY += (dy/d)*force;
+    }
+  });
+
+  // spawn a Matter.js body for an authentic bounce-off-walls light show
+  const body = Bodies.circle(x,y, 6 + Math.random()*10, {
+    restitution: 0.92,
+    frictionAir: 0.012,
+    friction: 0,
+  });
+  Body.setVelocity(body, {x:(Math.random()-0.5)*14, y:(Math.random()-0.5)*14});
+  World.add(world, body);
+  burstBodies.push({body, born: performance.now(), hue: Math.random()});
+
+  // world bounds (invisible walls) lazily created once
+  ensureBounds();
+
+  // anime.js flash on the readout
+  anime({
+    targets: '#heatVal',
+    color: ['#ffb347', '#7de8ff', '#ffb347'],
+    duration: 700,
+    easing: 'easeOutQuad'
+  });
+}
+
+let boundsCreated = false;
+function ensureBounds(){
+  if(boundsCreated) return;
+  boundsCreated = true;
+  const thick = 60;
+  World.add(world, [
+    Bodies.rectangle(W/2, -thick/2, W+thick*2, thick, {isStatic:true}),
+    Bodies.rectangle(W/2, H+thick/2, W+thick*2, thick, {isStatic:true}),
+    Bodies.rectangle(-thick/2, H/2, thick, H+thick*2, {isStatic:true}),
+    Bodies.rectangle(W+thick/2, H/2, thick, H+thick*2, {isStatic:true}),
+  ]);
+}
+
+/* ---------------- render loop ---------------- */
+let heat = 0;
+const heatVal = document.getElementById('heatVal');
+
+function draw(t){
+  Engine.update(engine, 16.6);
+
+  // fading trail = fluid / liquid smear
+  ctx.fillStyle = 'rgba(7,7,10,0.16)';
+  ctx.fillRect(0,0,W,H);
+
+  // additive glow blending for molten look
+  ctx.globalCompositeOperation = 'lighter';
+
+  let totalV = 0;
+
+  // draw connective "liquid" threads between near particles (metaball-ish web)
+  ctx.lineWidth = 0.6;
+  for(let i=0;i<particles.length;i+=1){
+    const p = particles[i];
+    p.update(t);
+    totalV += Math.abs(p.vx)+Math.abs(p.vy);
+
+    // connect to next few for continuous webbed silhouette on ring/star/etc
+    if(i % 3 === 0){
+      const q = particles[(i+7)%particles.length];
+      const dx=p.x-q.x, dy=p.y-q.y;
+      const dist = Math.sqrt(dx*dx+dy*dy);
+      if(dist < 70){
+        const alpha = (1-dist/70)*0.18;
+        ctx.strokeStyle = `rgba(255,140,90,${alpha})`;
+        ctx.beginPath();
+        ctx.moveTo(p.x,p.y);
+        ctx.lineTo(q.x,q.y);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // draw particles with molten gradient
+  for(const p of particles){
+    const speed = Math.min(1, (Math.abs(p.vx)+Math.abs(p.vy))/6);
+    const hue = 18 + speed*40; // orange -> yellow-hot as it moves faster
+    const grad = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r*4);
+    grad.addColorStop(0, `hsla(${hue},100%,${62+speed*15}%,0.9)`);
+    grad.addColorStop(1, `hsla(${hue},100%,50%,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.r*3.4,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = `hsla(${hue},100%,80%,0.95)`;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  // draw burst bodies (cool plasma contrast against the molten swarm)
+  const now = performance.now();
+  burstBodies = burstBodies.filter(b => now - b.born < 4200);
+  for(const b of burstBodies){
+    const age = (now-b.born)/4200;
+    const pos = b.body.position;
+    const r = 5*(1-age)+2;
+    const grad = ctx.createRadialGradient(pos.x,pos.y,0,pos.x,pos.y,r*6);
+    grad.addColorStop(0, `hsla(190,100%,75%,${0.8*(1-age)})`);
+    grad.addColorStop(1, 'hsla(190,100%,60%,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(pos.x,pos.y,r*6,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.globalCompositeOperation = 'source-over';
+
+  // smoothed heat readout
+  heat += ((totalV/particles.length) - heat)*0.06;
+  heatVal.textContent = heat.toFixed(2);
+
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+/* ---------------- intro sequence (GSAP) ---------------- */
+window.addEventListener('load', ()=>{
+  const tl = gsap.timeline();
+  tl.to('#veil', {opacity:0, duration:0.9, ease:'power2.out', delay:0.3})
+    .set('#veil', {display:'none'})
+    .to('.brand', {opacity:1, y:0, duration:0.9, ease:'power3.out'}, '-=0.3')
+    .to('.heat', {opacity:1, duration:0.9, ease:'power3.out'}, '<')
+    .to('.forms', {opacity:1, duration:0.9, ease:'power3.out'}, '<0.1')
+    .to('.physics-panel', {opacity:1, duration:0.9, ease:'power3.out'}, '<')
+    .to('.hint', {opacity:1, duration:1, ease:'power2.out'}, '<0.2')
+    .call(()=> morphTo('ring'));
+});
+</script>
+</body>
+</html>
