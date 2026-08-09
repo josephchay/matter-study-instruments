@@ -1,0 +1,1593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0d2645">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="FLUX — an interactive particle physics apparatus built from a curl-like vector field, spring lattices, shape interpolation, projectile motion and gooey rigid bodies.">
+<title>FLUX — A Live Apparatus for Particle Mechanics</title>
+<style>
+  :root{
+    --paper:#0d2645;
+    --paper-deep:#081b33;
+    --paper-light:#13345e;
+    --ink:#eaf3ff;
+    --ink-dim:#7fa0c4;
+    --signal:#ff7a3d;
+    --signal-cyan:#5ee0ff;
+    --line:rgba(234,243,255,0.12);
+    --line-strong:rgba(234,243,255,0.22);
+    --mono:ui-monospace,'SF Mono','Cascadia Code','Roboto Mono',Menlo,Consolas,monospace;
+    --display:-apple-system,'Segoe UI','Helvetica Neue',Arial,sans-serif;
+    --body-font:-apple-system,'Segoe UI',Arial,sans-serif;
+    --fs-hero:clamp(3.4rem,12vw,9rem);
+    --fs-title:clamp(2.3rem,7.4vw,4.6rem);
+    --fs-eyebrow:clamp(.68rem,1.3vw,.82rem);
+    --fs-body:clamp(1rem,1.5vw,1.1rem);
+  }
+
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    min-height:100vh;
+    overflow-x:hidden;
+    font-family:var(--body-font);
+    color:var(--ink);
+    background-color:var(--paper);
+    background-image:
+      linear-gradient(var(--line) 1px,transparent 1px),
+      linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:44px 44px;
+    line-height:1.5;
+  }
+  img,svg,canvas{display:block;max-width:100%;}
+  a{color:inherit;text-decoration:none;}
+  button{font:inherit;color:inherit;background:none;border:none;}
+  button,a,.nav-tick,.morph-btn{cursor:pointer;}
+  ul{list-style:none;}
+  ::selection{background:var(--signal);color:var(--paper-deep);}
+
+  a:focus-visible,button:focus-visible{outline:2px solid var(--signal);outline-offset:3px;border-radius:2px;}
+
+  body.has-custom-cursor,
+  body.has-custom-cursor a,
+  body.has-custom-cursor button,
+  body.has-custom-cursor .nav-tick,
+  body.has-custom-cursor .morph-btn{cursor:none;}
+
+  /* ---------- grain ---------- */
+  #grain{
+    position:fixed;inset:0;
+    opacity:.045;
+    mix-blend-mode:overlay;
+    pointer-events:none;
+    z-index:9990;
+    background-repeat:repeat;
+  }
+
+  /* ---------- custom cursor ---------- */
+  #cursor-dot,#cursor-ring{
+    position:fixed;top:0;left:0;
+    pointer-events:none;
+    z-index:9995;
+    transform:translate(-100px,-100px);
+    will-change:transform;
+  }
+  #cursor-dot{
+    width:6px;height:6px;margin:-3px 0 0 -3px;
+    background:var(--signal);
+    border-radius:50%;
+  }
+  #cursor-ring{
+    width:34px;height:34px;margin:-17px 0 0 -17px;
+    border:1px solid var(--ink-dim);
+    border-radius:50%;
+    transition:width .2s ease,height .2s ease,margin .2s ease,border-color .2s ease,background .2s ease;
+  }
+  #cursor-ring.is-active{
+    width:52px;height:52px;margin:-26px 0 0 -26px;
+    border-color:var(--signal);
+    background:rgba(255,122,61,0.08);
+  }
+
+  /* ---------- telemetry HUD ---------- */
+  #telemetry{
+    position:fixed;top:0;left:0;right:0;
+    z-index:60;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:14px clamp(16px,3vw,32px);
+    font-family:var(--mono);
+    font-size:.68rem;
+    letter-spacing:.06em;
+    color:var(--ink-dim);
+    pointer-events:none;
+    mix-blend-mode:normal;
+  }
+  #telemetry .tel-brand{color:var(--ink);font-weight:600;}
+  #telemetry .tel-group{display:flex;gap:18px;flex-wrap:wrap;}
+  #telemetry .tel-group span b{color:var(--signal-cyan);font-weight:600;}
+
+  /* ---------- side nav ---------- */
+  #side-nav{
+    position:fixed;
+    right:clamp(10px,2.4vw,28px);
+    top:50%;
+    transform:translateY(-50%);
+    z-index:60;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+    align-items:flex-end;
+  }
+  .nav-tick{
+    display:flex;align-items:center;gap:8px;
+    font-family:var(--mono);
+    font-size:.64rem;
+    letter-spacing:.08em;
+    color:var(--ink-dim);
+    background:none;
+    padding:4px 0;
+  }
+  .nav-tick .nav-tick__line{width:18px;height:1px;background:var(--line-strong);transition:width .25s ease,background .25s ease;}
+  .nav-tick .nav-tick__label{opacity:0;transform:translateX(4px);transition:opacity .2s ease,transform .2s ease;}
+  .nav-tick:hover .nav-tick__label,.nav-tick.is-active .nav-tick__label{opacity:1;transform:translateX(0);}
+  .nav-tick.is-active .nav-tick__line{width:30px;background:var(--signal);}
+  .nav-tick.is-active{color:var(--ink);}
+
+  /* ---------- preloader ---------- */
+  #preloader{
+    position:fixed;inset:0;
+    z-index:9999;
+    background:var(--paper-deep);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:18px;
+  }
+  #preloader .pre-label{
+    font-family:var(--mono);
+    font-size:.72rem;
+    letter-spacing:.18em;
+    color:var(--ink-dim);
+  }
+  #preloader-count{
+    font-family:var(--display);
+    font-weight:800;
+    font-size:clamp(3rem,10vw,5rem);
+    color:var(--ink);
+    letter-spacing:-.03em;
+    font-variant-numeric:tabular-nums;
+  }
+  #preloader-count::after{content:'%';font-size:.4em;color:var(--signal-cyan);margin-left:4px;}
+  .pre-bar{width:min(280px,60vw);height:2px;background:var(--line);overflow:hidden;}
+  .pre-bar__fill{height:100%;width:0%;background:linear-gradient(90deg,var(--signal-cyan),var(--signal));}
+
+  /* ---------- layout helpers ---------- */
+  main{position:relative;z-index:1;}
+  section[data-section]{
+    position:relative;
+    min-height:100vh;
+    min-height:100svh;
+    display:flex;
+    align-items:center;
+    padding:clamp(90px,10vh,140px) clamp(20px,5vw,64px) clamp(50px,7vh,90px);
+  }
+  .figure-grid{
+    width:100%;
+    max-width:1320px;
+    margin:0 auto;
+    display:flex;
+    align-items:center;
+    gap:clamp(28px,5vw,72px);
+  }
+  .figure-grid.is-reversed{flex-direction:row-reverse;}
+  .figure-text{flex:0 0 auto;width:min(420px,42%);}
+  .figure-stage{flex:1 1 auto;min-width:0;position:relative;}
+  @media (max-width:860px){
+    .figure-grid,.figure-grid.is-reversed{flex-direction:column;align-items:stretch;}
+    .figure-text{width:100%;}
+    .figure-stage{width:100%;}
+  }
+
+  .figure-eyebrow{
+    font-family:var(--mono);
+    font-size:var(--fs-eyebrow);
+    letter-spacing:.14em;
+    color:var(--signal);
+    margin-bottom:14px;
+    display:block;
+  }
+  .figure-title{
+    font-family:var(--display);
+    font-weight:800;
+    font-size:var(--fs-title);
+    letter-spacing:-.03em;
+    line-height:.96;
+    text-transform:uppercase;
+    margin-bottom:18px;
+  }
+  .figure-body{
+    font-size:var(--fs-body);
+    color:var(--ink-dim);
+    max-width:46ch;
+    margin-bottom:20px;
+  }
+  .figure-body b{color:var(--ink);font-weight:600;}
+  .figure-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+
+  .btn{
+    font-family:var(--mono);
+    font-size:.72rem;
+    letter-spacing:.1em;
+    padding:12px 22px;
+    border:1px solid var(--line-strong);
+    color:var(--ink);
+    transition:border-color .2s ease,background .2s ease,color .2s ease,transform .2s ease;
+  }
+  .btn:hover{border-color:var(--signal);background:rgba(255,122,61,0.08);}
+  .btn:active{transform:scale(.97);}
+  .btn:disabled{opacity:.45;cursor:default;}
+  .btn.is-primary{background:var(--signal);border-color:var(--signal);color:var(--paper-deep);font-weight:600;}
+  .btn.is-primary:hover{background:#ff8f5c;}
+
+  .figure-stat{font-family:var(--mono);color:var(--signal-cyan);}
+
+  /* ---------- hero ---------- */
+  #hero{padding-top:0;overflow:hidden;}
+  /* radial fallback backdrop — visible only if the WebGL canvas
+     above it never paints (e.g. three.js failed to load) */
+  #hero-canvas{
+    position:absolute;inset:0;width:100%;height:100%;
+    background:radial-gradient(ellipse at 30% 45%,rgba(94,224,255,.14),transparent 55%),
+               radial-gradient(ellipse at 70% 60%,rgba(255,122,61,.12),transparent 55%);
+  }
+  .hero-content{
+    position:relative;z-index:2;
+    padding:0 clamp(20px,6vw,80px);
+    max-width:900px;
+  }
+  .hero-content::before{
+    content:'';
+    position:absolute;inset:-15% -10%;
+    background:radial-gradient(ellipse at 30% 50%,rgba(8,27,51,.6),transparent 68%);
+    z-index:-1;
+    pointer-events:none;
+  }
+  .hero-eyebrow{
+    font-family:var(--mono);font-size:var(--fs-eyebrow);letter-spacing:.16em;
+    color:var(--signal-cyan);margin-bottom:10px;display:block;
+  }
+  .hero-title{
+    font-family:var(--display);font-weight:800;
+    font-size:var(--fs-hero);letter-spacing:-.045em;line-height:.85;
+    margin-bottom:22px;
+  }
+  .hero-body{font-size:var(--fs-body);color:var(--ink-dim);max-width:44ch;margin-bottom:10px;}
+  .hero-scroll-cue{
+    position:absolute;left:clamp(20px,6vw,80px);bottom:36px;z-index:2;
+    display:flex;align-items:center;gap:10px;
+    font-family:var(--mono);font-size:.66rem;letter-spacing:.16em;color:var(--ink-dim);
+  }
+  .hero-scroll-cue span.chev{display:inline-block;animation:bob 1.8s ease-in-out infinite;}
+  @keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(6px);}}
+  .hero-corner-fig{position:absolute;right:clamp(20px,6vw,80px);bottom:36px;z-index:2;font-family:var(--mono);font-size:.66rem;color:var(--ink-dim);text-align:right;}
+  .hero-corner-fig b{color:var(--signal-cyan);}
+
+  /* ---------- figure stage frames (crosshair registration marks) ---------- */
+  .stage-frame{
+    position:relative;
+    border:1px solid var(--line);
+    background:rgba(234,243,255,0.02);
+    aspect-ratio:4/3;
+  }
+  .stage-frame::before,.stage-frame::after,
+  .stage-frame .cf-tr,.stage-frame .cf-bl{
+    content:'';position:absolute;width:14px;height:14px;pointer-events:none;
+  }
+  .stage-frame::before{top:-1px;left:-1px;border-top:1px solid var(--signal);border-left:1px solid var(--signal);}
+  .stage-frame::after{bottom:-1px;right:-1px;border-bottom:1px solid var(--signal);border-right:1px solid var(--signal);}
+
+  /* ---------- elastic ---------- */
+  #elastic-canvas{width:100%;height:100%;touch-action:none;}
+
+  /* ---------- morph ---------- */
+  .morph-stage{aspect-ratio:1/1;max-width:420px;margin:0 auto;display:flex;align-items:center;justify-content:center;}
+  .morph-stage svg{width:80%;height:80%;overflow:visible;}
+  #morph-path{stroke:var(--ink);stroke-width:1.4;transition:none;}
+  .morph-buttons{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;justify-content:center;}
+  .morph-btn{
+    font-family:var(--mono);font-size:.64rem;letter-spacing:.1em;
+    padding:8px 14px;border:1px solid var(--line-strong);color:var(--ink-dim);
+    transition:all .2s ease;
+  }
+  .morph-btn:hover{color:var(--ink);border-color:var(--ink-dim);}
+  .morph-btn.is-active{color:var(--paper-deep);background:var(--signal-cyan);border-color:var(--signal-cyan);}
+
+  /* ---------- burst ---------- */
+  #burst-canvas{width:100%;height:100%;}
+
+  /* ---------- playground / goo ---------- */
+  #playground-chamber{
+    position:relative;overflow:hidden;touch-action:none;
+    background:linear-gradient(180deg,rgba(234,243,255,.03),transparent 60%);
+  }
+  #playground-goo-layer{position:absolute;inset:0;filter:url(#goo-filter);pointer-events:none;}
+  .goo-blob{
+    position:absolute;top:0;left:0;border-radius:50%;
+    background:linear-gradient(155deg,var(--signal-cyan),var(--signal));
+    will-change:transform;
+  }
+  .chamber-hint{
+    position:absolute;bottom:14px;left:0;right:0;text-align:center;
+    font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;color:var(--ink-dim);
+    pointer-events:none;
+  }
+
+  /* ---------- footer ---------- */
+  footer{position:relative;z-index:1;padding:60px 0 40px;}
+  .tech-ticker{overflow:hidden;white-space:nowrap;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:16px 0;}
+  .tech-ticker__track{display:inline-flex;animation:ticker 30s linear infinite;}
+  .tech-ticker__track span{
+    font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;color:var(--ink-dim);
+    padding:0 22px;border-right:1px solid var(--line);white-space:nowrap;
+  }
+  @keyframes ticker{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+  .footer-meta{
+    max-width:1320px;margin:22px auto 0;padding:0 clamp(20px,5vw,64px);
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;
+    font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;color:var(--ink-dim);
+  }
+
+  /* ---------- native scroll fallback (no Lenis) ---------- */
+  html.native-scroll{scroll-behavior:smooth;scroll-snap-type:y proximity;}
+  html.native-scroll section[data-section]{scroll-snap-align:start;}
+
+  /* ---------- reduced motion ---------- */
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;}
+  }
+
+  @media (max-width:640px){
+    #side-nav{display:none;}
+    #telemetry .tel-group{gap:10px;}
+    #telemetry span:not(.tel-brand){display:none;}
+    #telemetry span.tel-brand{display:inline;}
+  }
+</style>
+</head>
+<body>
+
+<div id="grain"></div>
+<div id="cursor-dot"></div>
+<div id="cursor-ring"></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="goo-filter">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="blur"/>
+      <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -11" result="goo"/>
+      <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
+    </filter>
+    <linearGradient id="morph-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:var(--signal-cyan)"/>
+      <stop offset="100%" style="stop-color:var(--signal)"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<div id="preloader">
+  <div class="pre-label">CALIBRATING FIELD&hellip;</div>
+  <div id="preloader-count">0</div>
+  <div class="pre-bar"><div class="pre-bar__fill" id="preloader-bar-fill"></div></div>
+</div>
+
+<div id="telemetry">
+  <span class="tel-brand">FLUX.LAB</span>
+  <div class="tel-group">
+    <span>STATE&nbsp;<b id="tel-state">—</b></span>
+    <span>FIELD&nbsp;<b id="tel-particles">—</b>&nbsp;PTS</span>
+    <span>CURSOR&nbsp;<b id="tel-mouse">0, 0</b></span>
+    <span>FPS&nbsp;<b id="tel-fps">60</b></span>
+  </div>
+</div>
+
+<nav id="side-nav">
+  <button class="nav-tick" data-target="hero"><span class="nav-tick__label">COVER</span><span class="nav-tick__line"></span></button>
+  <button class="nav-tick" data-target="elastic"><span class="nav-tick__label">01 TENSION</span><span class="nav-tick__line"></span></button>
+  <button class="nav-tick" data-target="morph"><span class="nav-tick__label">02 MORPHOLOGY</span><span class="nav-tick__line"></span></button>
+  <button class="nav-tick" data-target="burst"><span class="nav-tick__label">03 IMPULSE</span><span class="nav-tick__line"></span></button>
+  <button class="nav-tick" data-target="playground"><span class="nav-tick__label">04 COALESCENCE</span><span class="nav-tick__line"></span></button>
+</nav>
+
+<main>
+
+  <section id="hero" data-section="hero">
+    <canvas id="hero-canvas"></canvas>
+    <div class="hero-content">
+      <span class="hero-eyebrow">PARTICLE MECHANICS &mdash; LIVE APPARATUS</span>
+      <h1 class="hero-title">FLUX</h1>
+      <p class="hero-body">A field of points, each one answering to a vector equation and to you. Move the cursor through the field &mdash; scroll to open the rest of the apparatus.</p>
+    </div>
+    <div class="hero-scroll-cue"><span class="chev">&darr;</span> SCROLL TO BEGIN</div>
+    <div class="hero-corner-fig">WEBGL / GLSL<br><b>THREE.JS</b></div>
+  </section>
+
+  <section id="elastic" data-section="elastic">
+    <div class="figure-grid">
+      <div class="figure-text">
+        <span class="figure-eyebrow">FIG. 01 &mdash; SPRING LATTICE</span>
+        <h2 class="figure-title">Tension</h2>
+        <p class="figure-body">A grid of <b class="figure-stat" id="elastic-stat-bodies">&mdash;</b> bodies joined by <b class="figure-stat" id="elastic-stat-constraints">&mdash;</b> springs of varying mass and stiffness. Drag any node &mdash; the whole lattice answers.</p>
+        <div class="figure-actions">
+          <button class="btn" id="elastic-shake">SHAKE THE LATTICE</button>
+        </div>
+      </div>
+      <div class="figure-stage">
+        <div class="stage-frame"><canvas id="elastic-canvas"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="morph" data-section="morph">
+    <div class="figure-grid is-reversed">
+      <div class="figure-text">
+        <span class="figure-eyebrow">FIG. 02 &mdash; SHAPE INTERPOLATION</span>
+        <h2 class="figure-title">Morphology</h2>
+        <p class="figure-body">Forty generated points and one interpolator &mdash; the same data, walked from one silhouette to the next. Left running, it cycles on its own.</p>
+        <div class="morph-buttons">
+          <button class="morph-btn" data-shape="blob">BLOB</button>
+          <button class="morph-btn" data-shape="star">STAR</button>
+          <button class="morph-btn" data-shape="ripple">RIPPLE</button>
+          <button class="morph-btn" data-shape="slab">SLAB</button>
+          <button class="morph-btn" data-shape="disc">DISC</button>
+        </div>
+      </div>
+      <div class="figure-stage">
+        <div class="stage-frame morph-stage">
+          <svg viewBox="-20 -20 240 240">
+            <path id="morph-path" fill="url(#morph-gradient)"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="burst" data-section="burst">
+    <div class="figure-grid">
+      <div class="figure-text">
+        <span class="figure-eyebrow">FIG. 03 &mdash; PROJECTILE FIELD</span>
+        <h2 class="figure-title">Impulse</h2>
+        <p class="figure-body">These points hold the shape of a word until gravity says otherwise. Trigger it, then watch a spring pull every point back home.</p>
+        <div class="figure-actions">
+          <button class="btn is-primary" id="burst-trigger">SCATTER</button>
+        </div>
+      </div>
+      <div class="figure-stage">
+        <div class="stage-frame"><canvas id="burst-canvas"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="playground" data-section="playground">
+    <div class="figure-grid is-reversed">
+      <div class="figure-text">
+        <span class="figure-eyebrow">FIG. 04 &mdash; OPEN CHAMBER</span>
+        <h2 class="figure-title">Coalescence</h2>
+        <p class="figure-body">Click inside the chamber to drop a body. Gravity pulls, surface tension merges the ones that touch &mdash; nothing here is drawn, only computed.</p>
+        <div class="figure-actions">
+          <button class="btn" id="playground-clear">CLEAR CHAMBER</button>
+        </div>
+      </div>
+      <div class="figure-stage">
+        <div class="stage-frame">
+          <div id="playground-chamber">
+            <div id="playground-goo-layer"></div>
+            <div class="chamber-hint">CLICK TO DROP A BODY</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="tech-ticker">
+      <div class="tech-ticker__track">
+        <span>THREE.JS</span><span>GSAP</span><span>MATTER.JS</span><span>ANIME.JS</span><span>FLUBBER</span><span>LENIS</span><span>XSTATE</span><span>WEBGL / GLSL SHADERS</span><span>SVG GOO FILTER</span>
+        <span>THREE.JS</span><span>GSAP</span><span>MATTER.JS</span><span>ANIME.JS</span><span>FLUBBER</span><span>LENIS</span><span>XSTATE</span><span>WEBGL / GLSL SHADERS</span><span>SVG GOO FILTER</span>
+      </div>
+    </div>
+    <div class="footer-meta">
+      <span>FLUX.LAB &mdash; A PARTICLE PHYSICS APPARATUS</span>
+      <span>ASSEMBLED IN A SINGLE FILE</span>
+    </div>
+  </footer>
+
+</main>
+
+<!-- classic UMD libraries (verified on cdnjs) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.15.0/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flubber/0.4.2/flubber.min.js"></script>
+<!-- best-effort: not confirmed mirrored on cdnjs — code below has full working fallbacks either way -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lenis/1.1.13/lenis.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xstate/4.38.3/xstate.min.js"></script>
+
+<script type="module">
+/* ============================================================
+   FLUX — module entry point. three.js is ESM-only as of the
+   version mirrored on cdnjs, so the whole app lives in one
+   module script. Every other library (gsap, anime, Matter,
+   flubber, and best-effort Lenis/XState) was loaded above as a
+   classic script, so by the time this deferred module runs,
+   their globals already exist.
+   ============================================================ */
+// three.js is loaded with a dynamic import inside a try/catch, rather
+// than a static top-level import, so a failure to fetch it can't take
+// down the rest of the module — every other section (Matter.js, gsap,
+// anime.js, flubber) still boots normally if this one fails.
+let THREE = null;
+try {
+  THREE = await import('https://cdnjs.cloudflare.com/ajax/libs/three.js/0.185.1/three.module.min.js');
+} catch (e) {
+  console.warn('[flux] three.js failed to load — the hero field will be skipped:', e);
+}
+
+/* ============================================================
+   Utilities
+   ============================================================ */
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function debounce(fn, wait) {
+  let tm;
+  return (...args) => { clearTimeout(tm); tm = setTimeout(() => fn(...args), wait); };
+}
+
+function safeInit(fn, label) {
+  try { fn(); } catch (e) { console.warn('[flux] ' + label + ' failed to init:', e); }
+}
+
+function fitCanvas(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.max(1, Math.round(rect.width));
+  canvas.height = Math.max(1, Math.round(rect.height));
+}
+
+// Hand-rolled mass-spring-damper integrator (semi-implicit Euler).
+// Stands in for Framer Motion's spring model, which is React-only
+// and has no role in a plain HTML/JS environment like this one.
+class Spring {
+  constructor(stiffness = 170, damping = 24, mass = 1) {
+    this.k = stiffness;
+    this.c = damping;
+    this.m = mass;
+    this.pos = 0;
+    this.vel = 0;
+    this.target = 0;
+  }
+  set(value) { this.pos = value; this.target = value; this.vel = 0; }
+  update(dt) {
+    const force = -this.k * (this.pos - this.target) - this.c * this.vel;
+    const acc = force / this.m;
+    this.vel += acc * dt;
+    this.pos += this.vel * dt;
+    return this.pos;
+  }
+}
+
+// Generates a closed set of N points around a circle. Used for every
+// shape in the Morphology section — nothing is hand-drawn.
+function shapePoints({ n = 40, cx = 100, cy = 100, baseR = 70, wobble = 0, wobbleFreq = 5, phase = 0, star = false, innerRatio = 0.5 } = {}) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const theta = (i / n) * Math.PI * 2;
+    let r = baseR;
+    if (star) {
+      r = (i % 2 === 0) ? baseR : baseR * innerRatio;
+    } else if (wobble > 0) {
+      r = baseR + Math.sin(theta * wobbleFreq + phase) * wobble;
+    }
+    pts.push([cx + Math.cos(theta) * r, cy + Math.sin(theta) * r]);
+  }
+  return pts;
+}
+
+// Smooth closed path through a set of points via quadratic curves
+// through edge midpoints (original points act as control points).
+function smoothPath(points) {
+  const n = points.length;
+  const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  const f = (v) => v.toFixed(2);
+  const startMid = mid(points[n - 1], points[0]);
+  let d = `M ${f(startMid[0])},${f(startMid[1])} `;
+  for (let i = 0; i < n; i++) {
+    const cur = points[i];
+    const next = points[(i + 1) % n];
+    const m = mid(cur, next);
+    d += `Q ${f(cur[0])},${f(cur[1])} ${f(m[0])},${f(m[1])} `;
+  }
+  d += 'Z';
+  return d;
+}
+
+// Fallback shape interpolator used only if flubber did not load.
+// Since every shape here has the same point count, a direct
+// per-point lerp is enough to animate between them.
+function lerpShapeInterpolator(fromKey, toKey, shapeDefs) {
+  const a = shapeDefs[fromKey], b = shapeDefs[toKey];
+  return function (t) {
+    const pts = a.map((p, i) => [
+      p[0] + (b[i][0] - p[0]) * t,
+      p[1] + (b[i][1] - p[1]) * t
+    ]);
+    return smoothPath(pts);
+  };
+}
+
+function splitChars(el) {
+  const text = el.textContent;
+  el.textContent = '';
+  const spans = [];
+  for (const ch of text) {
+    const span = document.createElement('span');
+    span.textContent = ch === ' ' ? '\u00A0' : ch;
+    span.style.display = 'inline-block';
+    el.appendChild(span);
+    spans.push(span);
+  }
+  return spans;
+}
+
+/* ============================================================
+   Grain overlay — procedural, no external image
+   ============================================================ */
+function initGrain() {
+  const el = document.getElementById('grain');
+  if (!el) return;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  const imgData = ctx.createImageData(128, 128);
+  for (let i = 0; i < imgData.data.length; i += 4) {
+    const v = Math.random() * 255;
+    imgData.data[i] = v;
+    imgData.data[i + 1] = v;
+    imgData.data[i + 2] = v;
+    imgData.data[i + 3] = 255;
+  }
+  ctx.putImageData(imgData, 0, 0);
+  el.style.backgroundImage = `url(${c.toDataURL()})`;
+}
+
+/* ============================================================
+   Custom cursor — spring-lagged ring over a snapped dot
+   ============================================================ */
+let cursorDot, cursorRing, ringSpringX, ringSpringY, cursorRAF = null, cursorLastT = null, cursorSeeded = false;
+
+function initCursor() {
+  const isTouch = window.matchMedia('(pointer: coarse)').matches;
+  cursorDot = document.getElementById('cursor-dot');
+  cursorRing = document.getElementById('cursor-ring');
+  if (isTouch || !cursorDot || !cursorRing) return;
+
+  document.body.classList.add('has-custom-cursor');
+
+  if (prefersReducedMotion) {
+    window.addEventListener('pointermove', (e) => {
+      cursorDot.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+      cursorRing.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+    });
+    return;
+  }
+
+  ringSpringX = new Spring(140, 16, 1);
+  ringSpringY = new Spring(140, 16, 1);
+
+  window.addEventListener('pointermove', (e) => {
+    if (!cursorSeeded) {
+      ringSpringX.set(e.clientX);
+      ringSpringY.set(e.clientY);
+      cursorSeeded = true;
+    }
+    cursorDot.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+    ringSpringX.target = e.clientX;
+    ringSpringY.target = e.clientY;
+  });
+
+  document.querySelectorAll('a, button, .morph-btn, .nav-tick').forEach((el) => {
+    el.addEventListener('mouseenter', () => cursorRing.classList.add('is-active'));
+    el.addEventListener('mouseleave', () => cursorRing.classList.remove('is-active'));
+  });
+
+  cursorRAF = requestAnimationFrame(cursorLoop);
+}
+
+function cursorLoop(t) {
+  if (cursorLastT === null) cursorLastT = t;
+  const dt = Math.min((t - cursorLastT) / 1000, 0.05);
+  cursorLastT = t;
+  const rx = ringSpringX.update(dt);
+  const ry = ringSpringY.update(dt);
+  cursorRing.style.transform = `translate(${rx}px, ${ry}px)`;
+  cursorRAF = requestAnimationFrame(cursorLoop);
+}
+
+/* ============================================================
+   Preloader
+   ============================================================ */
+function runPreloader(onDone) {
+  const wrap = document.getElementById('preloader');
+  const counter = document.getElementById('preloader-count');
+  const barFill = document.getElementById('preloader-bar-fill');
+  if (!wrap) { onDone(); return; }
+
+  if (prefersReducedMotion) {
+    wrap.style.display = 'none';
+    onDone();
+    return;
+  }
+
+  const finish = () => {
+    if (window.gsap) {
+      gsap.timeline({ onComplete: () => { wrap.style.display = 'none'; onDone(); } })
+        .to(wrap, { yPercent: -100, duration: 0.9, ease: 'power4.inOut' });
+    } else {
+      wrap.style.transition = 'transform .7s ease';
+      wrap.style.transform = 'translateY(-100%)';
+      setTimeout(() => { wrap.style.display = 'none'; onDone(); }, 760);
+    }
+  };
+
+  if (window.gsap) {
+    const proxy = { v: 0 };
+    gsap.to(proxy, {
+      v: 100, duration: 1.3, ease: 'power2.inOut',
+      onUpdate: () => {
+        const val = Math.floor(proxy.v);
+        if (counter) counter.textContent = val;
+        if (barFill) barFill.style.width = val + '%';
+      },
+      onComplete: finish
+    });
+  } else {
+    const start = performance.now();
+    (function step(now) {
+      const t = Math.min(1, (now - start) / 1300);
+      const val = Math.floor(t * 100);
+      if (counter) counter.textContent = val;
+      if (barFill) barFill.style.width = val + '%';
+      if (t < 1) requestAnimationFrame(step); else finish();
+    })(start);
+  }
+}
+
+/* ============================================================
+   HERO — three.js GPU particle field, custom GLSL flow field
+   ============================================================ */
+const heroVert = `
+attribute float aSeed;
+attribute float aSize;
+uniform float uTime;
+uniform vec3 uMouse;
+uniform float uMouseStrength;
+uniform float uPixelRatio;
+varying float vNoise;
+varying float vAlpha;
+
+vec3 flowField(vec3 p, float t) {
+  vec3 f = vec3(0.0);
+  float amp = 1.0;
+  float freq = 1.0;
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i);
+    f.x += sin(p.y * freq + t * 0.6 + fi * 1.3) * amp;
+    f.y += sin(p.z * freq - t * 0.5 + fi * 1.7) * amp;
+    f.z += sin(p.x * freq + t * 0.4 - fi * 2.1) * amp;
+    freq *= 1.9;
+    amp *= 0.5;
+  }
+  return f;
+}
+
+void main() {
+  vec3 pos = position;
+  vec3 flow = flowField(pos * 0.6 + aSeed * 0.15, uTime * 0.15);
+  pos += flow * 0.4;
+
+  float d = distance(pos, uMouse);
+  float falloff = smoothstep(2.4, 0.0, d);
+  vec3 dir = normalize(pos - uMouse + 0.0001);
+  pos += dir * falloff * uMouseStrength * 1.6;
+
+  vNoise = clamp(length(flow) / 3.0, 0.0, 1.0);
+  vAlpha = 0.55 + falloff * 0.45;
+
+  vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+  gl_PointSize = aSize * uPixelRatio * (240.0 / -mvPosition.z);
+  gl_Position = projectionMatrix * mvPosition;
+}
+`;
+
+const heroFrag = `
+precision mediump float;
+uniform vec3 uColorA;
+uniform vec3 uColorB;
+varying float vNoise;
+varying float vAlpha;
+
+void main() {
+  vec2 uv = gl_PointCoord - 0.5;
+  float d = length(uv);
+  if (d > 0.5) discard;
+  float alpha = smoothstep(0.5, 0.0, d);
+  vec3 color = mix(uColorA, uColorB, vNoise);
+  gl_FragColor = vec4(color, alpha * vAlpha);
+}
+`;
+
+let heroScene, heroCamera, heroRenderer, heroParticles, heroUniforms, heroRAF = null, heroCanvas;
+let mouseTarget3D, mouseCurrent3D, mouseStrengthTarget = 0, mouseStrengthCurrent = 0;
+const heroClock0 = performance.now();
+
+function initHero() {
+  heroCanvas = document.getElementById('hero-canvas');
+  if (!heroCanvas || !THREE) return;
+
+  heroScene = new THREE.Scene();
+  heroCamera = new THREE.PerspectiveCamera(55, heroCanvas.clientWidth / heroCanvas.clientHeight, 0.1, 100);
+  heroCamera.position.z = 6.2;
+
+  heroRenderer = new THREE.WebGLRenderer({ canvas: heroCanvas, antialias: true, alpha: true });
+  const pr = Math.min(window.devicePixelRatio || 1, 2);
+  heroRenderer.setPixelRatio(pr);
+  heroRenderer.setSize(heroCanvas.clientWidth, heroCanvas.clientHeight, false);
+
+  const count = Math.max(1500, Math.min(12000, Math.floor((window.innerWidth * window.innerHeight) / 150)));
+  const positions = new Float32Array(count * 3);
+  const seeds = new Float32Array(count);
+  const sizes = new Float32Array(count);
+  for (let i = 0; i < count; i++) {
+    const r = 2.6 * Math.cbrt(Math.random());
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    positions[i * 3 + 0] = r * Math.sin(phi) * Math.cos(theta);
+    positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.7;
+    positions[i * 3 + 2] = r * Math.cos(phi);
+    seeds[i] = Math.random() * 60;
+    sizes[i] = Math.random() * 2.2 + 0.6;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
+  geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+
+  mouseTarget3D = new THREE.Vector3(999, 999, 999);
+  mouseCurrent3D = new THREE.Vector3(999, 999, 999);
+
+  heroUniforms = {
+    uTime: { value: 0 },
+    uMouse: { value: mouseCurrent3D },
+    uMouseStrength: { value: 0 },
+    uPixelRatio: { value: pr },
+    uColorA: { value: new THREE.Color(0x5ee0ff) },
+    uColorB: { value: new THREE.Color(0xff7a3d) }
+  };
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: heroUniforms,
+    vertexShader: heroVert,
+    fragmentShader: heroFrag,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+
+  heroParticles = new THREE.Points(geo, mat);
+  heroScene.add(heroParticles);
+
+  heroCanvas.addEventListener('pointermove', onHeroPointerMove);
+  heroCanvas.addEventListener('pointerleave', () => { mouseStrengthTarget = 0; });
+
+  const particleCountEl = document.getElementById('tel-particles');
+  if (particleCountEl) particleCountEl.textContent = count.toLocaleString();
+}
+
+function onHeroPointerMove(e) {
+  const rect = heroCanvas.getBoundingClientRect();
+  const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  mouseTarget3D.set(nx * 3.4, ny * 2.3, 0.6);
+  mouseStrengthTarget = 1;
+}
+
+function heroLoop() {
+  const t = (performance.now() - heroClock0) / 1000;
+  heroUniforms.uTime.value = t;
+
+  mouseCurrent3D.lerp(mouseTarget3D, 0.06);
+  mouseStrengthCurrent += (mouseStrengthTarget - mouseStrengthCurrent) * 0.08;
+  heroUniforms.uMouseStrength.value = mouseStrengthCurrent;
+
+  if (heroParticles) {
+    heroParticles.rotation.y += 0.0009;
+    heroParticles.rotation.x = Math.sin(t * 0.08) * 0.08;
+  }
+
+  heroRenderer.render(heroScene, heroCamera);
+  heroRAF = requestAnimationFrame(heroLoop);
+}
+function startHero() { if (heroRenderer && !heroRAF) heroRAF = requestAnimationFrame(heroLoop); }
+function stopHero() { if (heroRAF) { cancelAnimationFrame(heroRAF); heroRAF = null; } }
+
+function resizeHero() {
+  if (!heroCanvas || !heroRenderer || !heroCamera) return;
+  const w = heroCanvas.clientWidth, h = heroCanvas.clientHeight;
+  heroCamera.aspect = w / h;
+  heroCamera.updateProjectionMatrix();
+  heroRenderer.setSize(w, h, false);
+}
+
+/* ============================================================
+   FIG. 01 — TENSION — Matter.js spring lattice ("jelly" mesh)
+   ============================================================ */
+let elasticEngine, elasticBodies, elasticConstraints, elasticCanvas, elasticCtx, elasticRAF = null;
+const elasticCols = 14, elasticRows = 9;
+
+function initElastic() {
+  elasticCanvas = document.getElementById('elastic-canvas');
+  if (!elasticCanvas || !window.Matter) return;
+  const { Engine, Bodies, Composite, Constraint, Mouse, MouseConstraint, Body } = Matter;
+
+  elasticEngine = Engine.create();
+  elasticEngine.gravity.y = 0.4;
+
+  fitCanvas(elasticCanvas);
+  elasticCtx = elasticCanvas.getContext('2d');
+
+  const w = elasticCanvas.width, h = elasticCanvas.height;
+  const marginX = w * 0.1, marginY = h * 0.16;
+  const spacingX = (w - marginX * 2) / (elasticCols - 1);
+  const spacingY = (h - marginY * 2) / (elasticRows - 1);
+
+  elasticBodies = [];
+  for (let y = 0; y < elasticRows; y++) {
+    const row = [];
+    for (let x = 0; x < elasticCols; x++) {
+      const mass = 0.8 + Math.random() * 1.6;
+      const radius = 3.2 + mass * 1.5;
+      const body = Bodies.circle(marginX + x * spacingX, marginY + y * spacingY, radius, {
+        friction: 0.05,
+        frictionAir: 0.02,
+        restitution: 0.5,
+        density: 0.0012 * mass
+      });
+      body.renderRadius = radius;
+      row.push(body);
+      Composite.add(elasticEngine.world, body);
+    }
+    elasticBodies.push(row);
+  }
+
+  elasticConstraints = [];
+  const stiffness = 0.045, damping = 0.12;
+  function link(a, b) {
+    const c = Constraint.create({ bodyA: a, bodyB: b, stiffness, damping });
+    elasticConstraints.push(c);
+    Composite.add(elasticEngine.world, c);
+  }
+  for (let y = 0; y < elasticRows; y++) {
+    for (let x = 0; x < elasticCols; x++) {
+      if (x < elasticCols - 1) link(elasticBodies[y][x], elasticBodies[y][x + 1]);
+      if (y < elasticRows - 1) link(elasticBodies[y][x], elasticBodies[y + 1][x]);
+    }
+  }
+  for (let x = 0; x < elasticCols; x++) Body.setStatic(elasticBodies[0][x], true);
+
+  const mouse = Mouse.create(elasticCanvas);
+  const mouseConstraint = MouseConstraint.create(elasticEngine, {
+    mouse,
+    constraint: { stiffness: 0.2, damping: 0.15, render: { visible: false } }
+  });
+  Composite.add(elasticEngine.world, mouseConstraint);
+
+  const bodiesEl = document.getElementById('elastic-stat-bodies');
+  const consEl = document.getElementById('elastic-stat-constraints');
+  if (bodiesEl) bodiesEl.textContent = (elasticCols * elasticRows).toLocaleString();
+  if (consEl) consEl.textContent = elasticConstraints.length.toLocaleString();
+
+  const shakeBtn = document.getElementById('elastic-shake');
+  if (shakeBtn) shakeBtn.addEventListener('click', shakeElastic);
+}
+
+function shakeElastic() {
+  if (!elasticBodies) return;
+  const { Body } = Matter;
+  elasticBodies.forEach((row) => row.forEach((b) => {
+    if (b.isStatic) return;
+    Body.applyForce(b, b.position, {
+      x: (Math.random() - 0.5) * 0.05 * b.mass,
+      y: (Math.random() - 0.9) * 0.05 * b.mass
+    });
+  }));
+}
+
+function drawElastic() {
+  const w = elasticCanvas.width, h = elasticCanvas.height;
+  elasticCtx.clearRect(0, 0, w, h);
+
+  elasticCtx.fillStyle = 'rgba(94, 224, 255, 0.10)';
+  for (let y = 0; y < elasticRows - 1; y++) {
+    for (let x = 0; x < elasticCols - 1; x++) {
+      const a = elasticBodies[y][x].position;
+      const b = elasticBodies[y][x + 1].position;
+      const c = elasticBodies[y + 1][x + 1].position;
+      const d = elasticBodies[y + 1][x].position;
+      elasticCtx.beginPath();
+      elasticCtx.moveTo(a.x, a.y);
+      elasticCtx.lineTo(b.x, b.y);
+      elasticCtx.lineTo(c.x, c.y);
+      elasticCtx.lineTo(d.x, d.y);
+      elasticCtx.closePath();
+      elasticCtx.fill();
+    }
+  }
+
+  elasticCtx.strokeStyle = 'rgba(234, 243, 255, 0.35)';
+  elasticCtx.lineWidth = 1;
+  elasticConstraints.forEach((c) => {
+    elasticCtx.beginPath();
+    elasticCtx.moveTo(c.bodyA.position.x, c.bodyA.position.y);
+    elasticCtx.lineTo(c.bodyB.position.x, c.bodyB.position.y);
+    elasticCtx.stroke();
+  });
+
+  elasticBodies.forEach((row) => row.forEach((b) => {
+    elasticCtx.beginPath();
+    elasticCtx.fillStyle = b.isStatic ? 'rgba(255,122,61,0.9)' : 'rgba(234,243,255,0.85)';
+    elasticCtx.arc(b.position.x, b.position.y, b.renderRadius, 0, Math.PI * 2);
+    elasticCtx.fill();
+  }));
+}
+
+function elasticLoop() {
+  Matter.Engine.update(elasticEngine, 1000 / 60);
+  drawElastic();
+  elasticRAF = requestAnimationFrame(elasticLoop);
+}
+function startElastic() { if (elasticEngine && !elasticRAF) elasticRAF = requestAnimationFrame(elasticLoop); }
+function stopElastic() { if (elasticRAF) { cancelAnimationFrame(elasticRAF); elasticRAF = null; } }
+
+/* ============================================================
+   FIG. 02 — MORPHOLOGY — flubber + gsap shape interpolation
+   ============================================================ */
+let morphShapeDefs = {};
+let morphPathEl, morphCurrentKey = 'blob', morphAutoTimer = null, morphTween = null;
+const morphOrder = ['blob', 'star', 'ripple', 'slab', 'disc'];
+
+function buildMorphShapes() {
+  morphShapeDefs = {
+    blob: shapePoints({ n: 40, cx: 100, cy: 100, baseR: 62, wobble: 16, wobbleFreq: 3, phase: 0.4 }),
+    star: shapePoints({ n: 40, cx: 100, cy: 100, baseR: 74, star: true, innerRatio: 0.48 }),
+    ripple: shapePoints({ n: 40, cx: 100, cy: 100, baseR: 60, wobble: 10, wobbleFreq: 9, phase: 1.1 }),
+    slab: shapePoints({ n: 40, cx: 100, cy: 100, baseR: 64, wobble: 22, wobbleFreq: 4, phase: 0.78 }),
+    disc: shapePoints({ n: 40, cx: 100, cy: 100, baseR: 66, wobble: 0 })
+  };
+}
+
+function initMorph() {
+  morphPathEl = document.getElementById('morph-path');
+  if (!morphPathEl) return;
+  buildMorphShapes();
+  morphPathEl.setAttribute('d', smoothPath(morphShapeDefs[morphCurrentKey]));
+  updateMorphButtons(morphCurrentKey);
+
+  document.querySelectorAll('.morph-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      stopMorphCycle();
+      morphTo(btn.dataset.shape);
+    });
+  });
+}
+
+function morphTo(nextKey) {
+  if (!morphShapeDefs[nextKey] || nextKey === morphCurrentKey) return;
+  const fromKey = morphCurrentKey;
+  const fromD = morphPathEl.getAttribute('d');
+  const toD = smoothPath(morphShapeDefs[nextKey]);
+
+  let interpolator;
+  if (window.flubber && typeof window.flubber.interpolate === 'function') {
+    try {
+      interpolator = window.flubber.interpolate(fromD, toD, { maxSegmentLength: 3 });
+    } catch (e) {
+      interpolator = lerpShapeInterpolator(fromKey, nextKey, morphShapeDefs);
+    }
+  } else {
+    interpolator = lerpShapeInterpolator(fromKey, nextKey, morphShapeDefs);
+  }
+
+  morphCurrentKey = nextKey;
+  updateMorphButtons(nextKey);
+
+  if (morphTween && morphTween.kill) morphTween.kill();
+  const proxy = { t: 0 };
+
+  if (window.gsap) {
+    morphTween = gsap.to(proxy, {
+      t: 1, duration: 1.3, ease: 'elastic.out(1, 0.65)',
+      onUpdate: () => morphPathEl.setAttribute('d', interpolator(proxy.t))
+    });
+  } else {
+    const start = performance.now();
+    (function step(now) {
+      const t = Math.min(1, (now - start) / 1300);
+      morphPathEl.setAttribute('d', interpolator(t));
+      if (t < 1) requestAnimationFrame(step);
+    })(start);
+  }
+}
+
+function updateMorphButtons(key) {
+  document.querySelectorAll('.morph-btn').forEach((b) => {
+    b.classList.toggle('is-active', b.dataset.shape === key);
+  });
+}
+
+function startMorphCycle() {
+  if (prefersReducedMotion) return;
+  stopMorphCycle();
+  morphAutoTimer = setInterval(() => {
+    const idx = morphOrder.indexOf(morphCurrentKey);
+    morphTo(morphOrder[(idx + 1) % morphOrder.length]);
+  }, 3200);
+}
+function stopMorphCycle() {
+  if (morphAutoTimer) { clearInterval(morphAutoTimer); morphAutoTimer = null; }
+}
+
+/* ============================================================
+   FIG. 03 — IMPULSE — anime.js projectile burst + spring reform
+   ============================================================ */
+let burstCanvas, burstCtx, burstParticles = [], burstRAF = null, burstPhase = 'formed';
+const burstWord = 'MASS';
+
+function sampleTextPoints(word, w, h, maxPoints = 420) {
+  const off = document.createElement('canvas');
+  off.width = w; off.height = h;
+  const octx = off.getContext('2d');
+  octx.fillStyle = '#fff';
+  const fontSize = Math.min(w / (word.length * 0.62), h * 0.55);
+  octx.font = `900 ${fontSize}px sans-serif`;
+  octx.textAlign = 'center';
+  octx.textBaseline = 'middle';
+  octx.fillText(word, w / 2, h / 2);
+  const data = octx.getImageData(0, 0, w, h).data;
+  const candidates = [];
+  const scanStride = 3;
+  for (let y = 0; y < h; y += scanStride) {
+    for (let x = 0; x < w; x += scanStride) {
+      const idx = (y * w + x) * 4;
+      if (data[idx + 3] > 128) candidates.push({ x, y });
+    }
+  }
+  const step = Math.max(1, Math.ceil(candidates.length / maxPoints));
+  const pts = [];
+  for (let i = 0; i < candidates.length; i += step) pts.push(candidates[i]);
+  return pts;
+}
+
+function initBurst() {
+  burstCanvas = document.getElementById('burst-canvas');
+  if (!burstCanvas) return;
+  fitCanvas(burstCanvas);
+  burstCtx = burstCanvas.getContext('2d');
+  resetBurstParticles();
+  drawBurstStatic();
+
+  const btn = document.getElementById('burst-trigger');
+  if (btn) btn.addEventListener('click', triggerBurst);
+}
+
+function resetBurstParticles() {
+  const w = burstCanvas.width, h = burstCanvas.height;
+  const homes = sampleTextPoints(burstWord, w, h);
+  burstParticles = homes.map((p) => ({
+    hx: p.x, hy: p.y, x: p.x, y: p.y, vx: 0, vy: 0,
+    mass: 0.6 + Math.random() * 1.2,
+    r: 1.1 + Math.random() * 1.4
+  }));
+  burstPhase = 'formed';
+}
+
+function drawBurstStatic() {
+  const w = burstCanvas.width, h = burstCanvas.height;
+  burstCtx.clearRect(0, 0, w, h);
+  burstCtx.fillStyle = 'rgba(234, 243, 255, 0.9)';
+  burstParticles.forEach((p) => {
+    burstCtx.beginPath();
+    burstCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    burstCtx.fill();
+  });
+}
+
+function drawBurstDynamic(color) {
+  const w = burstCanvas.width, h = burstCanvas.height;
+  burstCtx.clearRect(0, 0, w, h);
+  burstCtx.fillStyle = color;
+  burstParticles.forEach((p) => {
+    burstCtx.beginPath();
+    burstCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    burstCtx.fill();
+  });
+}
+
+function triggerBurst() {
+  if (burstPhase === 'scattering') return;
+  const btn = document.getElementById('burst-trigger');
+  if (btn) { btn.disabled = true; btn.textContent = 'RUNNING\u2026'; }
+
+  burstPhase = 'scattering';
+  burstParticles.forEach((p) => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2 + Math.random() * 6;
+    p.vx = Math.cos(angle) * speed;
+    p.vy = Math.sin(angle) * speed - 3;
+  });
+
+  if (burstRAF) cancelAnimationFrame(burstRAF);
+  const scatterStart = performance.now();
+  const scatterDuration = 950;
+
+  function scatterStep(now) {
+    const elapsed = now - scatterStart;
+    burstParticles.forEach((p) => {
+      p.vy += 0.22 * p.mass;
+      p.vx *= 0.992;
+      p.x += p.vx;
+      p.y += p.vy;
+    });
+    drawBurstDynamic('rgba(94, 224, 255, 0.9)');
+    if (elapsed < scatterDuration) {
+      burstRAF = requestAnimationFrame(scatterStep);
+    } else {
+      startReform();
+    }
+  }
+  burstRAF = requestAnimationFrame(scatterStep);
+}
+
+function startReform() {
+  burstPhase = 'reforming';
+  const btn = document.getElementById('burst-trigger');
+  const onSettled = () => {
+    burstPhase = 'formed';
+    if (btn) { btn.disabled = false; btn.textContent = 'SCATTER AGAIN'; }
+  };
+
+  if (window.anime) {
+    anime({
+      targets: burstParticles,
+      x: (p) => p.hx,
+      y: (p) => p.hy,
+      duration: 1400,
+      delay: anime.stagger(1.5, { from: 'center' }),
+      easing: 'spring(1, 62, 9, 0)',
+      update: () => drawBurstDynamic('rgba(255, 122, 61, 0.9)'),
+      complete: onSettled
+    });
+  } else {
+    manualSpringReform(onSettled);
+  }
+}
+
+function manualSpringReform(onSettled) {
+  const k = 90, damping = 12;
+  function step() {
+    let settled = true;
+    burstParticles.forEach((p) => {
+      const fx = -k * (p.x - p.hx) - damping * p.vx;
+      const fy = -k * (p.y - p.hy) - damping * p.vy;
+      p.vx += (fx / p.mass) * 0.016;
+      p.vy += (fy / p.mass) * 0.016;
+      p.x += p.vx * 0.016;
+      p.y += p.vy * 0.016;
+      if (Math.abs(p.x - p.hx) > 0.3 || Math.abs(p.y - p.hy) > 0.3) settled = false;
+    });
+    drawBurstDynamic('rgba(255, 122, 61, 0.9)');
+    if (!settled) burstRAF = requestAnimationFrame(step);
+    else onSettled();
+  }
+  burstRAF = requestAnimationFrame(step);
+}
+
+/* ============================================================
+   FIG. 04 — COALESCENCE — Matter.js bodies + SVG goo filter
+   ============================================================ */
+let playgroundEngine, playgroundBodies = [], playgroundEls = [], playgroundContainer, playgroundLayer, playgroundRAF = null;
+const PLAYGROUND_MAX = 34;
+
+function initPlayground() {
+  playgroundContainer = document.getElementById('playground-chamber');
+  playgroundLayer = document.getElementById('playground-goo-layer');
+  if (!playgroundContainer || !playgroundLayer || !window.Matter) return;
+
+  const { Engine, Bodies, Composite } = Matter;
+  playgroundEngine = Engine.create();
+  playgroundEngine.gravity.y = 0.65;
+
+  const w = playgroundContainer.clientWidth, h = playgroundContainer.clientHeight;
+  const thickness = 60;
+  const ground = Bodies.rectangle(w / 2, h + thickness / 2 - 2, w + thickness * 2, thickness, { isStatic: true });
+  const left = Bodies.rectangle(-thickness / 2 + 2, h / 2, thickness, h * 3, { isStatic: true });
+  const right = Bodies.rectangle(w + thickness / 2 - 2, h / 2, thickness, h * 3, { isStatic: true });
+  Composite.add(playgroundEngine.world, [ground, left, right]);
+
+  playgroundContainer.addEventListener('click', onPlaygroundClick);
+
+  const clearBtn = document.getElementById('playground-clear');
+  if (clearBtn) clearBtn.addEventListener('click', clearPlayground);
+}
+
+function onPlaygroundClick(e) {
+  const rect = playgroundContainer.getBoundingClientRect();
+  spawnBlob(e.clientX - rect.left, e.clientY - rect.top);
+}
+
+function spawnBlob(x, y) {
+  if (!playgroundEngine) return;
+  const { Bodies, Composite } = Matter;
+  const r = 16 + Math.random() * 20;
+  const body = Bodies.circle(x, y, r, {
+    restitution: 0.7,
+    friction: 0.03,
+    frictionAir: 0.012,
+    density: 0.0016 + Math.random() * 0.001
+  });
+  Composite.add(playgroundEngine.world, body);
+  playgroundBodies.push(body);
+
+  const el = document.createElement('div');
+  el.className = 'goo-blob';
+  el.style.width = el.style.height = (r * 2) + 'px';
+  playgroundLayer.appendChild(el);
+  playgroundEls.push(el);
+
+  if (playgroundBodies.length > PLAYGROUND_MAX) {
+    const oldBody = playgroundBodies.shift();
+    const oldEl = playgroundEls.shift();
+    Composite.remove(playgroundEngine.world, oldBody);
+    oldEl.remove();
+  }
+}
+
+function clearPlayground() {
+  if (!playgroundEngine) return;
+  const { Composite } = Matter;
+  playgroundBodies.forEach((b) => Composite.remove(playgroundEngine.world, b));
+  playgroundEls.forEach((el) => el.remove());
+  playgroundBodies = [];
+  playgroundEls = [];
+}
+
+function playgroundLoop() {
+  Matter.Engine.update(playgroundEngine, 1000 / 60);
+  for (let i = 0; i < playgroundBodies.length; i++) {
+    const b = playgroundBodies[i];
+    const el = playgroundEls[i];
+    el.style.transform = `translate(${(b.position.x - b.circleRadius).toFixed(1)}px, ${(b.position.y - b.circleRadius).toFixed(1)}px)`;
+  }
+  playgroundRAF = requestAnimationFrame(playgroundLoop);
+}
+function startPlayground() { if (playgroundEngine && !playgroundRAF) playgroundRAF = requestAnimationFrame(playgroundLoop); }
+function stopPlayground() { if (playgroundRAF) { cancelAnimationFrame(playgroundRAF); playgroundRAF = null; } }
+
+/* ============================================================
+   Lenis smooth scroll (progressive enhancement)
+   ============================================================ */
+let lenisInstance = null;
+
+function initLenis() {
+  if (window.Lenis) {
+    try {
+      lenisInstance = new Lenis({
+        duration: 1.15,
+        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+        smoothWheel: true,
+        autoRaf: true
+      });
+      return;
+    } catch (e) {
+      lenisInstance = null;
+    }
+  }
+  document.documentElement.classList.add('native-scroll');
+}
+
+function scrollToSection(el) {
+  if (lenisInstance && typeof lenisInstance.scrollTo === 'function') {
+    lenisInstance.scrollTo(el, { offset: 0 });
+  } else {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+/* ============================================================
+   State machine (xstate if present, matching fallback otherwise)
+   drives which section's render loop is "live"
+   ============================================================ */
+const SECTION_IDS = ['hero', 'elastic', 'morph', 'burst', 'playground'];
+const animatedSections = new Set();
+let smService = null, usingXState = false, currentSectionId = null;
+
+function sectionEnter(id) {
+  if (id === 'hero') startHero();
+  if (id === 'elastic') startElastic();
+  if (id === 'morph') startMorphCycle();
+  if (id === 'playground') startPlayground();
+  animateSectionIn(id);
+  updateTelemetryState(id);
+}
+function sectionExit(id) {
+  if (id === 'hero') stopHero();
+  if (id === 'elastic') stopElastic();
+  if (id === 'morph') stopMorphCycle();
+  if (id === 'playground') stopPlayground();
+}
+
+function initStateMachine() {
+  const XS = window.XState;
+  if (XS && (XS.createMachine || XS.Machine) && XS.interpret) {
+    try {
+      const create = XS.createMachine || XS.Machine;
+      const states = {};
+      SECTION_IDS.forEach((id) => {
+        const on = {};
+        SECTION_IDS.forEach((other) => { if (other !== id) on['GOTO_' + other.toUpperCase()] = other; });
+        states[id] = { entry: 'enter_' + id, exit: 'exit_' + id, on };
+      });
+      const actions = {};
+      SECTION_IDS.forEach((id) => {
+        actions['enter_' + id] = () => sectionEnter(id);
+        actions['exit_' + id] = () => sectionExit(id);
+      });
+      const machine = create({ id: 'flux', initial: 'hero', states }, { actions });
+      smService = XS.interpret(machine).start();
+      usingXState = true;
+      return;
+    } catch (e) {
+      usingXState = false;
+      smService = null;
+    }
+  }
+  usingXState = false;
+}
+
+function goto(id) {
+  if (id === currentSectionId) return;
+  if (usingXState && smService) {
+    smService.send('GOTO_' + id.toUpperCase());
+  } else {
+    if (currentSectionId) sectionExit(currentSectionId);
+    sectionEnter(id);
+  }
+  currentSectionId = id;
+  updateNavUI(id);
+}
+
+/* ============================================================
+   Section entrance animation (gsap-driven kinetic type)
+   ============================================================ */
+function animateSectionIn(id) {
+  if (animatedSections.has(id)) return;
+  animatedSections.add(id);
+  const section = document.querySelector(`[data-section="${id}"]`);
+  if (!section) return;
+  const eyebrow = section.querySelector('.figure-eyebrow');
+  const heading = section.querySelector('.figure-title');
+  const body = section.querySelector('.figure-body');
+  if (!window.gsap) return;
+
+  const tl = gsap.timeline();
+  if (eyebrow) tl.from(eyebrow, { opacity: 0, y: 12, duration: 0.5, ease: 'power2.out' });
+  if (heading) tl.from(splitChars(heading), { yPercent: 120, opacity: 0, duration: 0.85, ease: 'back.out(1.6)', stagger: 0.018 }, '-=0.25');
+  if (body) tl.from(body, { opacity: 0, y: 14, duration: 0.6, ease: 'power2.out' }, '-=0.5');
+}
+
+/* ============================================================
+   Nav + telemetry
+   ============================================================ */
+function initNav() {
+  document.querySelectorAll('.nav-tick').forEach((tick) => {
+    tick.addEventListener('click', () => {
+      const el = document.querySelector(`[data-section="${tick.dataset.target}"]`);
+      if (el) scrollToSection(el);
+    });
+  });
+}
+function updateNavUI(id) {
+  document.querySelectorAll('.nav-tick').forEach((tick) => {
+    tick.classList.toggle('is-active', tick.dataset.target === id);
+  });
+}
+
+let telemetryMouse = { x: 0, y: 0 };
+let telFpsEl, telMouseEl, telStateEl;
+let fpsFrames = 0, fpsLast = performance.now();
+
+function initTelemetry() {
+  telStateEl = document.getElementById('tel-state');
+  telFpsEl = document.getElementById('tel-fps');
+  telMouseEl = document.getElementById('tel-mouse');
+  window.addEventListener('pointermove', (e) => {
+    telemetryMouse.x = Math.round(e.clientX);
+    telemetryMouse.y = Math.round(e.clientY);
+  });
+  requestAnimationFrame(telemetryLoop);
+}
+function telemetryLoop(now) {
+  fpsFrames++;
+  if (now - fpsLast > 500) {
+    const fps = Math.round((fpsFrames * 1000) / (now - fpsLast));
+    fpsFrames = 0;
+    fpsLast = now;
+    if (telFpsEl) telFpsEl.textContent = fps;
+  }
+  if (telMouseEl) telMouseEl.textContent = `${telemetryMouse.x}, ${telemetryMouse.y}`;
+  requestAnimationFrame(telemetryLoop);
+}
+function updateTelemetryState(id) {
+  if (telStateEl) telStateEl.textContent = id.toUpperCase();
+}
+
+/* ============================================================
+   Scroll-driven section activation
+   ============================================================ */
+function initScrollObserver() {
+  const sections = document.querySelectorAll('[data-section]');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+        goto(entry.target.dataset.section);
+      }
+    });
+  }, { threshold: [0.5] });
+  sections.forEach((s) => io.observe(s));
+}
+
+/* ============================================================
+   Boot
+   ============================================================ */
+function boot() {
+  initGrain();
+  safeInit(initCursor, 'cursor');
+  safeInit(initHero, 'hero');
+  safeInit(initElastic, 'elastic');
+  safeInit(initMorph, 'morph');
+  safeInit(initBurst, 'burst');
+  safeInit(initPlayground, 'playground');
+  safeInit(initLenis, 'lenis');
+  safeInit(initStateMachine, 'state-machine');
+  initNav();
+  initTelemetry();
+  initScrollObserver();
+
+  runPreloader(() => {
+    currentSectionId = 'hero';
+    sectionEnter('hero');
+    updateNavUI('hero');
+  });
+}
+
+document.addEventListener('DOMContentLoaded', boot);
+window.addEventListener('resize', debounce(resizeHero, 200));
+
+</script>
+
+</body>
+</html>
