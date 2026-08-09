@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Swell — Fluid Field</title>
+<style>
+/* ======================================================================
+   TOKENS — a marine-instrument system: chart-adjacent, not oscilloscope.
+   Cooler, sea-glass palette; single warm buoy-orange accent (grounded in
+   real maritime signal colour, not a generic neon-on-dark choice).
+   ====================================================================== */
+:root{
+  --abyss:#061019;
+  --abyss-deep:#02060a;
+  --abyss-mid:#0c2333;
+  --foam:#dfeceb;
+  --foam-dim:#87a19c;
+  --foam-faint:#4c635f;
+  --line:rgba(223,236,235,0.12);
+  --line-strong:rgba(223,236,235,0.22);
+  --glass:rgba(223,236,235,0.045);
+  --buoy:#ff7a45;
+  --buoy-dim:rgba(255,122,69,0.35);
+  --teal:#38b7ac;
+  --radius:3px;
+  --radius-lg:10px;
+  --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Consolas, monospace;
+  --ease-strong: cubic-bezier(.16,1,.3,1);
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html{ background:var(--abyss-deep); }
+body{
+  margin:0; min-height:100vh; overflow-x:hidden;
+  background:
+    radial-gradient(ellipse 1000px 500px at 50% 6%, rgba(255,122,69,0.055), transparent 60%),
+    linear-gradient(180deg, #0c2333 0%, #071420 32%, #040d16 68%, #02060a 100%);
+  color:var(--foam);
+  font-family:var(--font-sans);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+body:not(.touch-device){ cursor:none; }
+body:not(.touch-device) a, body:not(.touch-device) button{ cursor:none; }
+.touch-device #cursor-dot, .touch-device #cursor-ring{ display:none; }
+
+a{ color:inherit; }
+button{ font-family:inherit; color:inherit; background:none; border:none; }
+:focus-visible{ outline:2px solid var(--buoy); outline-offset:3px; }
+::selection{ background:var(--buoy); color:#1a0a00; }
+
+#noise-overlay{
+  position:fixed; inset:0; z-index:1; pointer-events:none; opacity:.03; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ===== chart "fix" marks — a surveyor's position mark, corner signature ===== */
+.fix-mark{ position:absolute; width:13px; height:13px; pointer-events:none; opacity:.5; }
+.fix-mark::before,.fix-mark::after{ content:''; position:absolute; background:var(--line-strong); }
+.fix-mark::before{ left:50%; top:0; width:1px; height:100%; transform:translateX(-50%); }
+.fix-mark::after{ top:50%; left:0; height:1px; width:100%; transform:translateY(-50%); }
+.fix-mark .dot{ position:absolute; left:50%; top:50%; width:3px; height:3px; margin:-1.5px 0 0 -1.5px; border-radius:50%; background:var(--buoy); }
+.fix-tl{ top:8px; left:8px; } .fix-tr{ top:8px; right:8px; }
+.fix-bl{ bottom:8px; left:8px; } .fix-br{ bottom:8px; right:8px; }
+
+/* ===== custom cursor ===== */
+#cursor-dot,#cursor-ring{ position:fixed; top:0; left:0; pointer-events:none; z-index:999; border-radius:50%; }
+#cursor-dot{ width:6px; height:6px; background:var(--buoy); }
+#cursor-ring{ width:32px; height:32px; border:1px solid var(--foam-dim); transition:width .25s var(--ease-strong),height .25s var(--ease-strong),border-color .25s; }
+.cursor-hover #cursor-ring{ width:54px; height:54px; border-color:var(--buoy); }
+
+/* ===== preloader ===== */
+#preloader{ position:fixed; inset:0; z-index:100; background:var(--abyss-deep); display:flex; align-items:center; justify-content:center; }
+.preloader-inner{ width:min(340px,80vw); text-align:center; }
+.pre-logo{ font-family:var(--font-mono); font-size:.7rem; letter-spacing:.28em; color:var(--foam-dim); margin-bottom:18px; }
+.pre-bar{ height:2px; background:var(--line); position:relative; overflow:hidden; }
+.pre-bar-fill{ position:absolute; inset:0; width:0%; background:var(--buoy); }
+.pre-percent{ margin-top:10px; font-family:var(--font-mono); font-size:.7rem; color:var(--foam-faint); letter-spacing:.1em; }
+
+/* ===== fallback for no-webgl ===== */
+#webgl-fallback{ display:none; position:fixed; top:20%; left:50%; transform:translateX(-50%); max-width:420px; text-align:center; padding:16px 20px; background:var(--glass); border:1px solid var(--line); border-radius:var(--radius-lg); font-size:.8rem; color:var(--foam-dim); z-index:5; }
+.no-webgl #webgl-fallback{ display:block; }
+
+/* ===== canvas layer ===== */
+#ocean-canvas{ position:fixed; inset:0; width:100%; height:100%; z-index:0; display:block; }
+.no-webgl #ocean-canvas{ display:none; }
+
+/* ===== nav ===== */
+#site-nav{
+  position:fixed; top:0; left:0; right:0; z-index:50; display:flex; align-items:center; justify-content:space-between;
+  padding:16px 22px; border-bottom:1px solid var(--line); backdrop-filter:blur(6px);
+  background:linear-gradient(180deg, rgba(2,6,10,.55), rgba(2,6,10,0));
+  font-family:var(--font-mono);
+}
+.nav-logo{ display:flex; align-items:center; gap:10px; font-size:.76rem; letter-spacing:.14em; }
+.nav-logo b{ font-weight:600; }
+.nav-logo .mk{ color:var(--foam-faint); font-size:.68rem; }
+.nav-links{ display:flex; gap:22px; }
+.nav-link{ font-size:.68rem; letter-spacing:.14em; text-decoration:none; color:var(--foam-dim); text-transform:uppercase; opacity:0; padding:4px 2px; position:relative; }
+.nav-link::after{ content:''; position:absolute; left:0; bottom:0; width:0%; height:1px; background:var(--buoy); transition:width .3s var(--ease-strong); }
+.nav-link:hover{ color:var(--foam); }
+.nav-link:hover::after{ width:100%; }
+@media (max-width:720px){ .nav-links{ display:none; } }
+
+/* ===== scroll container / sections ===== */
+#scroll-container{ position:relative; z-index:2; }
+.panel{ min-height:100vh; display:flex; flex-direction:column; justify-content:center; padding:0 24px; position:relative; }
+.panel-inner{ max-width:1180px; margin:0 auto; width:100%; }
+
+.eyebrow{ font-family:var(--font-mono); font-size:.68rem; letter-spacing:.26em; color:var(--buoy); text-transform:uppercase; margin-bottom:18px; display:block; }
+
+/* hero */
+#hero{ padding-top:70px; }
+.hero-headline{ font-family:var(--font-display); font-size:clamp(2rem,6.4vw,4.6rem); font-weight:700; line-height:1.06; letter-spacing:-.01em; max-width:900px; margin:0; }
+.hero-headline .word{ display:inline-block; overflow:hidden; vertical-align:top; }
+.hero-headline .word-inner{ display:inline-block; }
+.hero-sub{ font-family:var(--font-sans); font-size:1.02rem; line-height:1.6; color:var(--foam-dim); max-width:520px; margin-top:26px; }
+.scroll-cue{ position:absolute; bottom:120px; left:24px; font-family:var(--font-mono); font-size:.66rem; letter-spacing:.2em; color:var(--foam-faint); display:flex; align-items:center; gap:8px; }
+.scroll-cue .bar{ width:1px; height:34px; background:linear-gradient(var(--buoy), transparent); animation:cueMove 1.8s ease-in-out infinite; }
+@keyframes cueMove{ 0%,100%{ opacity:.3; } 50%{ opacity:1; } }
+
+/* text panels */
+.text-panel .panel-inner{ max-width:640px; }
+.text-panel h2{ font-family:var(--font-display); font-size:clamp(1.5rem,3.6vw,2.4rem); line-height:1.15; letter-spacing:-.005em; margin:0 0 20px; }
+.text-panel p{ font-family:var(--font-sans); font-size:1.02rem; line-height:1.68; color:var(--foam-dim); margin:0; }
+.text-panel .eq-tag{ display:inline-block; margin-top:20px; font-family:var(--font-mono); font-size:.76rem; padding:6px 10px; border:1px solid var(--line-strong); border-radius:var(--radius); color:var(--buoy); background:var(--glass); }
+
+/* droplets section */
+#droplets{ background:var(--abyss); border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+#droplets .panel-inner{ max-width:1180px; }
+.droplet-head{ display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-end; gap:20px; margin-bottom:22px; }
+.droplet-head h2{ font-family:var(--font-display); font-size:clamp(1.5rem,3.6vw,2.2rem); margin:0 0 10px; letter-spacing:-.005em; }
+.droplet-head p{ font-family:var(--font-sans); color:var(--foam-dim); max-width:460px; margin:0; line-height:1.62; }
+.droplet-controls{ display:flex; gap:10px; font-family:var(--font-mono); }
+.btn-ghost{ font-size:.68rem; letter-spacing:.12em; text-transform:uppercase; padding:9px 14px; border:1px solid var(--line-strong); border-radius:var(--radius); color:var(--foam-dim); transition:border-color .2s, color .2s; }
+.btn-ghost:hover{ border-color:var(--buoy); color:var(--buoy); }
+.droplet-wrap{ position:relative; width:100%; height:60vh; min-height:420px; background:var(--abyss-deep); border:1px solid var(--line); border-radius:var(--radius-lg); overflow:hidden; }
+#droplet-canvas{ display:block; width:100%; height:100%; filter:blur(11px) contrast(24) brightness(1.06); }
+.droplet-hint{ position:absolute; bottom:10px; right:14px; font-family:var(--font-mono); font-size:.6rem; letter-spacing:.1em; color:var(--foam-faint); z-index:2; }
+
+/* footer */
+footer{ padding:60px 24px 50px; border-top:1px solid var(--line); text-align:center; }
+footer .stack{ font-family:var(--font-sans); font-size:.85rem; color:var(--foam-dim); max-width:640px; margin:0 auto 14px; line-height:1.62; }
+footer .credit{ font-family:var(--font-mono); font-size:.64rem; letter-spacing:.18em; color:var(--foam-faint); text-transform:uppercase; }
+
+/* ===== HUD readout ===== */
+#hud{
+  position:fixed; top:70px; right:18px; z-index:40; width:172px; padding:12px 13px; border:1px solid var(--line);
+  border-radius:var(--radius-lg); background:var(--glass); backdrop-filter:blur(8px); font-family:var(--font-mono); font-size:.66rem;
+}
+.hud-row{ display:flex; justify-content:space-between; padding:3px 0; color:var(--foam-dim); border-bottom:1px dashed var(--line); }
+.hud-row:last-child{ border-bottom:none; }
+.hud-row span:first-child{ letter-spacing:.12em; }
+.hud-row span:last-child{ color:var(--foam); text-align:right; }
+@media (max-width:720px){ #hud{ display:none; } }
+
+/* ===== control dock ===== */
+#dock{
+  position:fixed; left:50%; bottom:18px; transform:translateX(-50%); z-index:40; width:min(720px,94vw);
+  padding:14px 16px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--glass); backdrop-filter:blur(10px);
+  font-family:var(--font-mono);
+}
+.dock-label{ font-size:.6rem; letter-spacing:.24em; color:var(--foam-faint); margin-bottom:10px; text-transform:uppercase; }
+.dock-modes{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+.mode-btn{ flex:1 1 auto; padding:8px 6px; font-size:.64rem; letter-spacing:.1em; text-transform:uppercase; border:1px solid var(--line-strong); border-radius:var(--radius); color:var(--foam-dim); white-space:nowrap; transition:all .2s; }
+.mode-btn:hover{ color:var(--foam); border-color:var(--foam-dim); }
+.mode-btn.active{ color:#1a0d05; background:var(--buoy); border-color:var(--buoy); }
+.dock-row{ display:flex; gap:18px; flex-wrap:wrap; align-items:center; }
+.dock-slider{ flex:1 1 140px; display:flex; flex-direction:column; gap:5px; }
+.dock-slider label{ font-size:.6rem; letter-spacing:.1em; color:var(--foam-faint); text-transform:uppercase; display:flex; justify-content:space-between; }
+input[type=range]{ -webkit-appearance:none; appearance:none; width:100%; height:2px; background:var(--line-strong); border-radius:2px; outline-offset:6px; }
+input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:11px; height:11px; border-radius:50%; background:var(--buoy); cursor:none; margin-top:0; }
+input[type=range]::-moz-range-thumb{ width:11px; height:11px; border-radius:50%; background:var(--buoy); border:none; }
+.dock-toggle{ display:flex; gap:8px; }
+@media (max-width:640px){
+  #dock{ bottom:10px; padding:12px; }
+  .mode-btn{ font-size:.58rem; padding:7px 4px; }
+}
+
+#morph-logo{ display:block; }
+
+@media (prefers-reduced-motion: reduce){
+  .scroll-cue .bar{ animation:none; }
+}
+</style>
+</head>
+<body>
+
+  <div id="noise-overlay"></div>
+  <div id="cursor-dot"></div>
+  <div id="cursor-ring"></div>
+
+  <div id="preloader">
+    <div class="preloader-inner">
+      <div class="pre-logo">SWELL — READING SURFACE STATE</div>
+      <div class="pre-bar"><div class="pre-bar-fill"></div></div>
+      <div class="pre-percent">0%</div>
+    </div>
+  </div>
+
+  <div id="webgl-fallback">Your browser doesn't support WebGL, so the live ocean surface can't render here. The droplet playground further down still works.</div>
+
+  <nav id="site-nav">
+    <div class="nav-logo">
+      <svg id="morph-logo" viewBox="0 0 200 200" width="30" height="30">
+        <defs>
+          <linearGradient id="morphGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ff7a45"/>
+            <stop offset="100%" stop-color="#38b7ac"/>
+          </linearGradient>
+        </defs>
+        <path id="morph-path" d="" fill="url(#morphGrad)"></path>
+      </svg>
+      <span><b>SWELL</b> <span class="mk">/ FLUID FIELD</span></span>
+    </div>
+    <div class="nav-links">
+      <a href="#hero" class="nav-link" data-hover>Surface</a>
+      <a href="#waves" class="nav-link" data-hover>Waves</a>
+      <a href="#ripples" class="nav-link" data-hover>Ripples</a>
+      <a href="#droplets" class="nav-link" data-hover>Droplets</a>
+    </div>
+  </nav>
+
+  <canvas id="ocean-canvas"></canvas>
+
+  <main id="scroll-container">
+
+    <section id="hero" class="panel">
+      <div class="fix-mark fix-tl"><span class="dot"></span></div>
+      <div class="fix-mark fix-tr"><span class="dot"></span></div>
+      <div class="panel-inner">
+        <span class="eyebrow">STATE 0 — LIVE SURFACE</span>
+        <h1 class="hero-headline">Every wave you see is several waves at once.</h1>
+        <p class="hero-sub">A live ocean built from five trochoidal waves summed together in raw WebGL. Move your cursor across the water, then scroll to build the sea state.</p>
+      </div>
+      <div class="scroll-cue"><span class="bar"></span>SCROLL</div>
+    </section>
+
+    <section id="waves" class="panel text-panel">
+      <div class="panel-inner">
+        <span class="eyebrow">STATE II — SWELL BUILDING</span>
+        <h2>Crests peak. Troughs round out.</h2>
+        <p>Stack enough sine waves and you get chop, but real swell needs one more ingredient. Each point of water doesn't just bob up and down — it traces a small circle, moving forward at the crest and backward in the trough. That horizontal component is what turns a smooth sine curve into the sharp-crested, broad-troughed shape you're scrolling through, and it's why long, slow-looking swells always outrun the short chop riding on top of them.</p>
+        <span class="eq-tag">ω = √(g·k)</span>
+      </div>
+    </section>
+
+    <section id="ripples" class="panel text-panel">
+      <div class="panel-inner">
+        <span class="eyebrow">STATE IV — ROUGH</span>
+        <h2>Press the surface. Watch it ring outward.</h2>
+        <p>Underneath the swell sits a second simulation: a grid where every cell's height depends only on its four neighbours a moment ago. That's the wave equation, discretised — the same mathematics governing the big rolling swell above, just running at a smaller scale and a faster clock. Move your cursor across the water and you're injecting energy directly into that grid.</p>
+        <span class="eq-tag">∂²h/∂t² = c²∇²h</span>
+      </div>
+    </section>
+
+    <section id="droplets" class="panel">
+      <div class="fix-mark fix-tl"><span class="dot"></span></div>
+      <div class="fix-mark fix-tr"><span class="dot"></span></div>
+      <div class="fix-mark fix-bl"><span class="dot"></span></div>
+      <div class="fix-mark fix-br"><span class="dot"></span></div>
+      <div class="panel-inner">
+        <span class="eyebrow">READING 03 — COALESCENCE</span>
+        <div class="droplet-head">
+          <div>
+            <h2>Nothing here is really separate.</h2>
+            <p>These aren't sprites merging on cue. Each is a real Matter.js body with a soft pairwise pull standing in for surface tension, rendered through a blur-then-threshold filter that turns any two overlapping circles into one continuous blob. Drag two droplets close and watch them stop being two.</p>
+          </div>
+          <div class="droplet-controls">
+            <button class="btn-ghost" id="btn-droplet-reset" data-hover>Reset</button>
+            <button class="btn-ghost" id="btn-droplet-gravity" data-hover>Flip Gravity</button>
+          </div>
+        </div>
+        <div class="droplet-wrap">
+          <canvas id="droplet-canvas"></canvas>
+          <div class="droplet-hint">MATTER.JS — GOO-FILTER COALESCENCE</div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p class="stack">Built with Three.js, GSAP + ScrollTrigger, Matter.js, anime.js, Lenis, Flubber and XState — plus hand-rolled Gerstner wave summation, a finite-difference ripple solver, and a CSS blur/contrast trick standing in for true fluid rendering.</p>
+      <div class="credit">Swell — a fluid dynamics field</div>
+    </footer>
+
+  </main>
+
+  <div id="hud">
+    <div class="hud-row"><span>SEA STATE</span><span id="hud-sea">GLASSY</span></div>
+    <div class="hud-row"><span>SWELL</span><span id="hud-swell">—</span></div>
+    <div class="hud-row"><span>WIND</span><span id="hud-wind">—</span></div>
+    <div class="hud-row"><span>FPS</span><span id="hud-fps">—</span></div>
+  </div>
+
+  <div id="dock">
+    <div class="dock-label">Sea state</div>
+    <div class="dock-modes">
+      <button class="mode-btn active" data-sea="glassy" data-hover>Glassy</button>
+      <button class="mode-btn" data-sea="breeze" data-hover>Breeze</button>
+      <button class="mode-btn" data-sea="swell" data-hover>Swell</button>
+      <button class="mode-btn" data-sea="storm" data-hover>Storm</button>
+    </div>
+    <div class="dock-row">
+      <div class="dock-slider">
+        <label><span>Wind</span><span id="lbl-wind">100</span></label>
+        <input id="slider-wind" type="range" min="20" max="200" value="100">
+      </div>
+      <div class="dock-slider">
+        <label><span>Swell Height</span><span id="lbl-swell">100</span></label>
+        <input id="slider-swell" type="range" min="20" max="220" value="100">
+      </div>
+      <div class="dock-slider">
+        <label><span>Current</span><span id="lbl-current">0</span></label>
+        <input id="slider-current" type="range" min="0" max="100" value="0">
+      </div>
+      <div class="dock-toggle">
+        <button class="btn-ghost" id="btn-ripples" data-hover>Ripples: On</button>
+        <button class="btn-ghost" id="btn-splash" data-hover>⟳</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= CDN libraries (progressive enhancement — see fallbacks in script) ================= -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lenis/1.1.13/lenis.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/flubber/0.4.2/flubber.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xstate/4.38.3/xstate.min.js"></script>
+
+  <script>
+  /* ======================================================================
+     SWELL — a fluid dynamics field.
+     Three.js (WebGL render) + hand-rolled Gerstner wave summation and a
+     finite-difference ripple solver + GSAP/ScrollTrigger (choreography)
+     + Matter.js (droplet physics) + anime.js (micro-interactions)
+     + Lenis (smooth scroll, optional) + Flubber (SVG morph, optional)
+     + XState (sea-state machine, optional).
+
+     Note on Framer Motion: same as its companion piece, it's a React-only
+     library with no dependable vanilla CDN build, so it isn't imported
+     here. Lenis, Flubber and XState each have a plain-JS fallback wired
+     in below, so the page still works if any of those three don't
+     resolve on a given network.
+     ====================================================================== */
+
+  const TAU = Math.PI * 2;
+  const isTouchDevice = (window.matchMedia && matchMedia('(pointer:coarse)').matches) || 'ontouchstart' in window;
+  const prefersReducedMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  if (isTouchDevice) document.body.classList.add('touch-device');
+
+  /* ===================== utils ===================== */
+  function lerp(a,b,t){ return a+(b-a)*t; }
+  function clamp(v,lo,hi){ return v<lo?lo:(v>hi?hi:v); }
+  function hashRand(i){ const x=Math.sin(i*12.9898)*43758.5453; return x-Math.floor(x); }
+
+  /* ===================== ocean constants ===================== */
+  const OCEAN_WIDTH = 1800, OCEAN_DEPTH = 2400;
+  const OCEAN_SEGX = 139, OCEAN_SEGZ = 89;
+  const OCEAN_OFFSET = { x:0, y:-20, z:-520 };
+  const GRAVITY_CONST = 9.8;
+  const DOMINANT_ANGLE = 0.6;
+  const WAVE_DEFS = [
+    { wavelength:340, ampBase:7.2, angleOffset:-1.10, phase:0.0 },
+    { wavelength:210, ampBase:4.6, angleOffset:-0.40, phase:1.7 },
+    { wavelength:140, ampBase:3.1, angleOffset: 0.00, phase:3.4 },
+    { wavelength:95,  ampBase:1.9, angleOffset: 0.50, phase:5.1 },
+    { wavelength:62,  ampBase:1.1, angleOffset: 1.15, phase:2.2 }
+  ];
+  const SUM_AMP_BASE = WAVE_DEFS.reduce((s,w)=>s+w.ampBase,0);
+  const waveCache = WAVE_DEFS.map(()=>({ dirX:0, dirZ:0, k:0, A:0, speed:0, phase:0 }));
+
+  const RIPPLE_W = 96, RIPPLE_H = 128;
+  const RIPPLE_DAMPING = 0.988;
+  const FOAM_COUNT = 700;
+
+  /* ===================== sea-state presets ===================== */
+  const SEA_STATES = {
+    glassy: { ampScale:0.35, steepness:0.22, speedScale:0.65, dirSpread:0.15, windKt:3,  swellM:0.40 },
+    breeze: { ampScale:0.65, steepness:0.40, speedScale:0.85, dirSpread:0.40, windKt:11, swellM:0.75 },
+    swell:  { ampScale:1.00, steepness:0.55, speedScale:1.00, dirSpread:0.70, windKt:19, swellM:1.15 },
+    storm:  { ampScale:1.60, steepness:0.72, speedScale:1.25, dirSpread:1.10, windKt:33, swellM:1.85 }
+  };
+  function seaStateToParams(preset){
+    return { ampScale:preset.ampScale, steepness:preset.steepness, speedScale:preset.speedScale, dirSpread:preset.dirSpread };
+  }
+  const currentSeaParams = seaStateToParams(SEA_STATES.glassy);
+  let activeSeaName = 'glassy';
+  let windMultiplier = 1.0, swellMultiplier = 1.0, driftSpeed = 0.0;
+  let scrollChopBoost = 0;
+  let ripplesEnabled = true;
+
+  /* ===================== shaders ===================== */
+  const OCEAN_VERT = `
+    varying vec3 vWorldPos;
+    void main(){
+      vec4 worldPos = modelMatrix * vec4(position, 1.0);
+      vWorldPos = worldPos.xyz;
+      gl_Position = projectionMatrix * viewMatrix * worldPos;
+    }
+  `;
+  const OCEAN_FRAG = `
+    precision mediump float;
+    varying vec3 vWorldPos;
+    uniform vec3 uDeepColor;
+    uniform vec3 uShallowColor;
+    uniform vec3 uHorizonColor;
+    uniform vec3 uSunColor;
+    uniform vec3 uSunDir;
+    uniform float uTime;
+    void main(){
+      vec3 fdx = dFdx(vWorldPos);
+      vec3 fdy = dFdy(vWorldPos);
+      vec3 normal = normalize(cross(fdy, fdx));
+      vec3 viewDir = normalize(cameraPosition - vWorldPos);
+      float fresnel = pow(1.0 - clamp(dot(normal, viewDir), 0.0, 1.0), 3.5);
+      float heightMix = clamp(vWorldPos.y * 0.12 + 0.5, 0.0, 1.0);
+      vec3 base = mix(uDeepColor, uShallowColor, heightMix);
+      vec3 halfDir = normalize(viewDir + uSunDir);
+      float spec = pow(max(dot(normal, halfDir), 0.0), 60.0);
+      float sparkle = fract(sin(dot(floor(vWorldPos.xz*0.8), vec2(12.9898,78.233))) * 43758.5453 + uTime*1.7);
+      spec *= smoothstep(0.72, 1.0, sparkle) * 1.8 + 0.25;
+      vec3 color = mix(base, uHorizonColor, fresnel*0.6);
+      color += uSunColor * spec * 1.3;
+      float dist = length(cameraPosition - vWorldPos);
+      float distFade = smoothstep(900.0, 2400.0, dist);
+      color = mix(color, uHorizonColor, distFade);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `;
+  const FOAM_VERT = `
+    attribute float aSize;
+    attribute float aLife;
+    uniform float uPixelRatio;
+    varying float vLife;
+    void main(){
+      vLife = aLife;
+      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+      gl_PointSize = aSize * uPixelRatio * clamp(aLife,0.0,1.0) * (260.0 / -mvPosition.z);
+      gl_Position = projectionMatrix * mvPosition;
+    }
+  `;
+  const FOAM_FRAG = `
+    precision mediump float;
+    varying float vLife;
+    void main(){
+      vec2 uv = gl_PointCoord - 0.5;
+      float d = length(uv);
+      float alpha = smoothstep(0.5, 0.0, d) * clamp(vLife,0.0,1.0);
+      gl_FragColor = vec4(0.86, 0.93, 0.92, alpha*0.85);
+    }
+  `;
+
+  /* ===================== state ===================== */
+  let scene, camera, renderer;
+  let oceanMesh, oceanMaterial, oceanPositions, oceanPosAttr;
+  let foamPoints, foamMaterial, foamPos, foamVel, foamLife, foamSize, foamSeed, foamPosAttr, foamLifeAttr;
+  let foamCursor = 0;
+  let rippleA, rippleB;
+  let webglSupported = true;
+  let lenis = null;
+  let seaService = null;
+  let matterEngine=null, dropletWorld=null, dropletCanvas=null, dropletCtx=null, dropletWalls=[];
+  let droplets = [];
+  const SURFACE_TENSION_STRENGTH = 4.5;
+  let lastTime = performance.now();
+  let fpsSmoothed = 60;
+  let autoImpulseTimer = 0;
+  let inRipplesSection = false;
+  const raycaster = new (window.THREE ? THREE.Raycaster : Object)();
+  const pointerNDC = { x:0, y:0 };
+  let pointerDown = false;
+  let pointerOverOcean = false;
+  let oceanLocalX = 0, oceanLocalZ = 0;
+
+  /* ===================== ocean geometry ===================== */
+  function buildOceanGeometry(){
+    const vertsX = OCEAN_SEGX+1, vertsZ = OCEAN_SEGZ+1;
+    const count = vertsX*vertsZ;
+    const positions = new Float32Array(count*3);
+    let p=0;
+    for (let iz=0; iz<vertsZ; iz++){
+      const z0 = (iz/OCEAN_SEGZ-0.5)*OCEAN_DEPTH;
+      for (let ix=0; ix<vertsX; ix++){
+        const x0 = (ix/OCEAN_SEGX-0.5)*OCEAN_WIDTH;
+        positions[p++]=x0; positions[p++]=0; positions[p++]=z0;
+      }
+    }
+    const indices = [];
+    for (let iz=0; iz<OCEAN_SEGZ; iz++){
+      for (let ix=0; ix<OCEAN_SEGX; ix++){
+        const a=iz*vertsX+ix, b=a+1, c=a+vertsX, d=c+1;
+        indices.push(a,c,b, b,c,d);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions,3));
+    geo.setIndex(new THREE.BufferAttribute(new Uint16Array(indices),1));
+    return geo;
+  }
+
+  /* ===================== ripple field (finite-difference wave equation) ===================== */
+  function initRippleField(){
+    rippleA = new Float32Array(RIPPLE_W*RIPPLE_H);
+    rippleB = new Float32Array(RIPPLE_W*RIPPLE_H);
+  }
+  function updateRipples(){
+    const w = RIPPLE_W;
+    for (let j=1;j<RIPPLE_H-1;j++){
+      const row=j*w;
+      for (let i=1;i<w-1;i++){
+        const idx=row+i;
+        const v = (rippleA[idx-1]+rippleA[idx+1]+rippleA[idx-w]+rippleA[idx+w])*0.5 - rippleB[idx];
+        rippleB[idx] = v*RIPPLE_DAMPING;
+      }
+    }
+    const tmp=rippleA; rippleA=rippleB; rippleB=tmp;
+  }
+  function rippleSampleAt(x0,z0){
+    const gx = ((x0/OCEAN_WIDTH)+0.5)*(RIPPLE_W-1);
+    const gz = ((z0/OCEAN_DEPTH)+0.5)*(RIPPLE_H-1);
+    const ix = Math.floor(gx), iz = Math.floor(gz);
+    if (ix<0||iz<0||ix>=RIPPLE_W-1||iz>=RIPPLE_H-1) return 0;
+    const fx=gx-ix, fz=gz-iz;
+    const h00=rippleA[iz*RIPPLE_W+ix], h10=rippleA[iz*RIPPLE_W+ix+1];
+    const h01=rippleA[(iz+1)*RIPPLE_W+ix], h11=rippleA[(iz+1)*RIPPLE_W+ix+1];
+    const a=h00+(h10-h00)*fx, b=h01+(h11-h01)*fx;
+    return a+(b-a)*fz;
+  }
+  function injectRippleImpulse(x0,z0,strength){
+    const gx = Math.round(((x0/OCEAN_WIDTH)+0.5)*(RIPPLE_W-1));
+    const gz = Math.round(((z0/OCEAN_DEPTH)+0.5)*(RIPPLE_H-1));
+    if (gx<1||gz<1||gx>=RIPPLE_W-1||gz>=RIPPLE_H-1) return;
+    const idx=gz*RIPPLE_W+gx;
+    rippleA[idx] -= strength;
+    rippleA[idx-1] -= strength*0.5; rippleA[idx+1] -= strength*0.5;
+    rippleA[idx-RIPPLE_W] -= strength*0.5; rippleA[idx+RIPPLE_W] -= strength*0.5;
+  }
+
+  /* ===================== gerstner ocean update ===================== */
+  function updateOcean(t){
+    if (!oceanPositions) return;
+    const sp = currentSeaParams;
+    const ampScale = sp.ampScale*swellMultiplier*(1+scrollChopBoost*0.4);
+    const steepness = Math.min(sp.steepness*(1+scrollChopBoost*0.2),0.9);
+    const speedScale = sp.speedScale;
+    const dirSpread = sp.dirSpread*windMultiplier*(1+scrollChopBoost*0.6);
+    const drift = driftSpeed*t*0.06;
+
+    for (let w=0; w<WAVE_DEFS.length; w++){
+      const wd=WAVE_DEFS[w];
+      const k=TAU/wd.wavelength;
+      const angle=DOMINANT_ANGLE+wd.angleOffset*dirSpread;
+      const wc=waveCache[w];
+      wc.dirX=Math.cos(angle); wc.dirZ=Math.sin(angle);
+      wc.k=k; wc.A=wd.ampBase*ampScale;
+      wc.speed=Math.sqrt(GRAVITY_CONST*k)*speedScale;
+      wc.phase=wd.phase;
+    }
+
+    const P = oceanPositions;
+    let p=0;
+    for (let iz=0; iz<=OCEAN_SEGZ; iz++){
+      const z0=(iz/OCEAN_SEGZ-0.5)*OCEAN_DEPTH;
+      for (let ix=0; ix<=OCEAN_SEGX; ix++){
+        const x0=(ix/OCEAN_SEGX-0.5)*OCEAN_WIDTH;
+        let dx=0, dz=0, dy=0;
+        for (let w=0; w<waveCache.length; w++){
+          const wc=waveCache[w];
+          const theta = wc.k*(wc.dirX*x0+wc.dirZ*z0) - wc.speed*t + wc.phase + drift;
+          const c=Math.cos(theta), s=Math.sin(theta);
+          dx += steepness*wc.A*wc.dirX*c;
+          dz += steepness*wc.A*wc.dirZ*c;
+          dy += wc.A*s;
+        }
+        dy += rippleSampleAt(x0,z0);
+        P[p]=x0+dx; P[p+1]=dy; P[p+2]=z0+dz; p+=3;
+      }
+    }
+    if (oceanPosAttr) oceanPosAttr.needsUpdate = true;
+  }
+  function gerstnerHeightOnly(x0,z0,t,ampScale,dirSpread,speedScale){
+    let dy=0;
+    for (let w=0; w<WAVE_DEFS.length; w++){
+      const wd=WAVE_DEFS[w];
+      const k=TAU/wd.wavelength;
+      const angle=DOMINANT_ANGLE+wd.angleOffset*dirSpread;
+      const A=wd.ampBase*ampScale;
+      const speed=Math.sqrt(GRAVITY_CONST*k)*speedScale;
+      const theta=k*(Math.cos(angle)*x0+Math.sin(angle)*z0)-speed*t+wd.phase;
+      dy += A*Math.sin(theta);
+    }
+    return dy;
+  }
+
+  /* ===================== foam particles ===================== */
+  function initFoamSystem(){
+    foamPos = new Float32Array(FOAM_COUNT*3);
+    foamVel = new Float32Array(FOAM_COUNT*3);
+    foamLife = new Float32Array(FOAM_COUNT);
+    foamSize = new Float32Array(FOAM_COUNT);
+    foamSeed = new Float32Array(FOAM_COUNT);
+    for (let i=0;i<FOAM_COUNT;i++){ foamPos[i*3+1]=-9999; foamSize[i]=3+Math.random()*3; }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(foamPos,3));
+    geo.setAttribute('aLife', new THREE.BufferAttribute(foamLife,1));
+    geo.setAttribute('aSize', new THREE.BufferAttribute(foamSize,1));
+    foamMaterial = new THREE.ShaderMaterial({
+      uniforms:{ uPixelRatio:{value:Math.min(window.devicePixelRatio,2)} },
+      vertexShader:FOAM_VERT, fragmentShader:FOAM_FRAG,
+      transparent:true, depthWrite:false
+    });
+    foamPoints = new THREE.Points(geo, foamMaterial);
+    foamPoints.position.set(OCEAN_OFFSET.x, OCEAN_OFFSET.y, OCEAN_OFFSET.z);
+    scene.add(foamPoints);
+    foamPosAttr = geo.attributes.position;
+    foamLifeAttr = geo.attributes.aLife;
+  }
+  function spawnFoam(x,y,z,count,spreadSpeed){
+    if (!foamPos) return;
+    for (let n=0;n<count;n++){
+      const i=foamCursor; foamCursor=(foamCursor+1)%FOAM_COUNT;
+      const ix=i*3;
+      foamPos[ix]=x; foamPos[ix+1]=y; foamPos[ix+2]=z;
+      const ang=Math.random()*TAU, up=0.3+Math.random()*0.8;
+      const spd=(0.3+Math.random()*0.7)*spreadSpeed;
+      foamVel[ix]=Math.cos(ang)*spd*0.6;
+      foamVel[ix+1]=up*spd;
+      foamVel[ix+2]=Math.sin(ang)*spd*0.6;
+      foamLife[i]=0.7+Math.random()*0.6;
+    }
+  }
+  function updateFoam(dt){
+    if (!foamPos) return;
+    for (let i=0;i<FOAM_COUNT;i++){
+      if (foamLife[i]<=0){ continue; }
+      const ix=i*3;
+      foamVel[ix+1]-=9.0*dt;
+      foamPos[ix]+=foamVel[ix]*dt;
+      foamPos[ix+1]+=foamVel[ix+1]*dt;
+      foamPos[ix+2]+=foamVel[ix+2]*dt;
+      foamLife[i]-=dt*0.6;
+      if (foamPos[ix+1] < -4 || foamLife[i]<=0){ foamLife[i]=0; foamPos[ix+1]=-9999; }
+    }
+    if (foamPosAttr) foamPosAttr.needsUpdate = true;
+    if (foamLifeAttr) foamLifeAttr.needsUpdate = true;
+  }
+  function spawnAmbientFoam(t){
+    if (prefersReducedMotion) return;
+    const sp=currentSeaParams;
+    const ampScale=sp.ampScale*swellMultiplier;
+    const dirSpread=sp.dirSpread*windMultiplier;
+    const threshold=0.5*SUM_AMP_BASE*ampScale;
+    for (let n=0;n<4;n++){
+      const x0=(Math.random()-0.5)*OCEAN_WIDTH*0.85;
+      const z0=(Math.random()-0.5)*OCEAN_DEPTH*0.85;
+      const h=gerstnerHeightOnly(x0,z0,t,ampScale,dirSpread,sp.speedScale);
+      if (h>threshold) spawnFoam(x0,h,z0,1+Math.floor(Math.random()*2),1.4);
+    }
+  }
+
+  /* ===================== scene init ===================== */
+  function initScene(){
+    if (!window.THREE){ webglSupported=false; document.body.classList.add('no-webgl'); return; }
+    try{
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(58, window.innerWidth/window.innerHeight, 1, 5000);
+      camera.position.set(0,280,760);
+      camera.lookAt(0,-140,-600);
+      const canvasEl = document.getElementById('ocean-canvas');
+      renderer = new THREE.WebGLRenderer({ canvas:canvasEl, antialias:true, alpha:true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      const oceanGeo = buildOceanGeometry();
+      oceanMaterial = new THREE.ShaderMaterial({
+        uniforms:{
+          uTime:{value:0},
+          uDeepColor:{value:new THREE.Color(0.02,0.09,0.16)},
+          uShallowColor:{value:new THREE.Color(0.16,0.42,0.46)},
+          uHorizonColor:{value:new THREE.Color(0.05,0.14,0.20)},
+          uSunColor:{value:new THREE.Color(1.0,0.478,0.271)},
+          uSunDir:{value:new THREE.Vector3(0.35,0.75,0.25).normalize()}
+        },
+        vertexShader:OCEAN_VERT, fragmentShader:OCEAN_FRAG,
+        extensions:{ derivatives:true }
+      });
+      oceanMesh = new THREE.Mesh(oceanGeo, oceanMaterial);
+      oceanMesh.position.set(OCEAN_OFFSET.x, OCEAN_OFFSET.y, OCEAN_OFFSET.z);
+      scene.add(oceanMesh);
+      oceanPositions = oceanGeo.attributes.position.array;
+      oceanPosAttr = oceanGeo.attributes.position;
+
+      initFoamSystem();
+    }catch(err){
+      console.error('WebGL init failed', err);
+      webglSupported=false;
+      document.body.classList.add('no-webgl');
+    }
+  }
+
+  /* ===================== sea-state machine (XState, with fallback) ===================== */
+  function updateHUDReadout(){
+    const preset = SEA_STATES[activeSeaName];
+    const seaEl=document.getElementById('hud-sea'), swellEl=document.getElementById('hud-swell'), windEl=document.getElementById('hud-wind');
+    if (seaEl) seaEl.textContent = activeSeaName.toUpperCase();
+    if (swellEl) swellEl.textContent = (preset.swellM*swellMultiplier).toFixed(1)+'m';
+    if (windEl) windEl.textContent = Math.round(preset.windKt*windMultiplier)+'kt';
+  }
+  function updateSeaButtonsActive(name){
+    document.querySelectorAll('.mode-btn').forEach(btn=>{
+      btn.classList.toggle('active', btn.dataset.sea === name);
+    });
+  }
+  function applySeaState(name){
+    const preset = SEA_STATES[name];
+    if (!preset) return;
+    activeSeaName = name;
+    updateSeaButtonsActive(name);
+    updateHUDReadout();
+    const target = seaStateToParams(preset);
+    if (window.gsap){
+      gsap.to(currentSeaParams, Object.assign({}, target, { duration:1.4, ease:'power2.inOut' }));
+    } else {
+      Object.assign(currentSeaParams, target);
+    }
+  }
+  function selectSeaState(name){
+    if (seaService) seaService.send('SELECT_'+name);
+    else applySeaState(name);
+  }
+  function initSeaStateMachine(){
+    const names = Object.keys(SEA_STATES);
+    if (window.XState && window.XState.createMachine){
+      try{
+        const { createMachine, interpret } = window.XState;
+        const on = {};
+        names.forEach(n=>{ on['SELECT_'+n]=n; });
+        const states = {};
+        names.forEach(n=>{ states[n]={ on }; });
+        const machine = createMachine({ id:'seaState', initial:names[0], states });
+        seaService = interpret(machine).onTransition(state=>{ applySeaState(state.value); }).start();
+        return;
+      }catch(err){
+        console.warn('XState init failed, using manual sea-state switching instead.', err);
+        seaService = null;
+      }
+    }
+    applySeaState(names[0]);
+  }
+
+  /* ===================== pointer / cursor ===================== */
+  let cursorMoveTo = function(){};
+  function setupCursor(){
+    const dot=document.getElementById('cursor-dot'), ring=document.getElementById('cursor-ring');
+    if (window.gsap){
+      gsap.set(dot,{ xPercent:-50, yPercent:-50 });
+      gsap.set(ring,{ xPercent:-50, yPercent:-50 });
+      const dotX=gsap.quickTo(dot,'x',{duration:0.12,ease:'power3.out'});
+      const dotY=gsap.quickTo(dot,'y',{duration:0.12,ease:'power3.out'});
+      const ringX=gsap.quickTo(ring,'x',{duration:0.35,ease:'power3.out'});
+      const ringY=gsap.quickTo(ring,'y',{duration:0.35,ease:'power3.out'});
+      cursorMoveTo=function(x,y){ dotX(x); dotY(y); ringX(x); ringY(y); };
+    } else {
+      dot.style.transform='translate(-50%,-50%)'; ring.style.transform='translate(-50%,-50%)';
+      cursorMoveTo=function(x,y){ dot.style.left=x+'px'; dot.style.top=y+'px'; ring.style.left=x+'px'; ring.style.top=y+'px'; };
+    }
+  }
+  function onPointerMove(e){
+    const x=e.clientX, y=e.clientY;
+    pointerNDC.x=(x/window.innerWidth)*2-1;
+    pointerNDC.y=-(y/window.innerHeight)*2+1;
+    cursorMoveTo(x,y);
+    if (webglSupported && window.THREE && camera){
+      raycaster.setFromCamera(pointerNDC, camera);
+      const plane = new THREE.Plane(new THREE.Vector3(0,1,0), -OCEAN_OFFSET.y);
+      const hit = new THREE.Vector3();
+      const got = raycaster.ray.intersectPlane(plane, hit);
+      if (got){
+        const localX = hit.x - OCEAN_OFFSET.x;
+        const localZ = hit.z - OCEAN_OFFSET.z;
+        if (Math.abs(localX)<OCEAN_WIDTH/2 && Math.abs(localZ)<OCEAN_DEPTH/2){
+          pointerOverOcean=true; oceanLocalX=localX; oceanLocalZ=localZ;
+          if (ripplesEnabled){
+            injectRippleImpulse(localX, localZ, pointerDown?3.2:1.1);
+            if (Math.random()<0.15) spawnFoam(localX,2,localZ,2,1.6);
+          }
+        } else { pointerOverOcean=false; }
+      } else { pointerOverOcean=false; }
+    }
+  }
+  function onPointerDown(){
+    pointerDown=true;
+    if (pointerOverOcean && ripplesEnabled){
+      injectRippleImpulse(oceanLocalX, oceanLocalZ, 16);
+      spawnFoam(oceanLocalX, 3, oceanLocalZ, 22, 3.0);
+    }
+  }
+  function bindHoverElements(){
+    document.querySelectorAll('[data-hover]').forEach(el=>{
+      let toX=null, toY=null;
+      if (window.gsap){
+        toX=gsap.quickTo(el,'x',{duration:0.3,ease:'power3.out'});
+        toY=gsap.quickTo(el,'y',{duration:0.3,ease:'power3.out'});
+      }
+      el.addEventListener('mousemove',(e)=>{
+        const rect=el.getBoundingClientRect();
+        const relX=e.clientX-(rect.left+rect.width/2);
+        const relY=e.clientY-(rect.top+rect.height/2);
+        if (toX) toX(relX*0.3);
+        if (toY) toY(relY*0.3);
+      });
+      el.addEventListener('mouseenter',()=>{ document.body.classList.add('cursor-hover'); });
+      el.addEventListener('mouseleave',()=>{
+        document.body.classList.remove('cursor-hover');
+        if (toX) toX(0);
+        if (toY) toY(0);
+      });
+    });
+  }
+
+  /* ===================== scrollytelling ===================== */
+  function initScrollytelling(){
+    if (!(window.gsap && window.ScrollTrigger)) return;
+    gsap.registerPlugin(ScrollTrigger);
+
+    ScrollTrigger.create({
+      trigger:'#waves', start:'top bottom', endTrigger:'#ripples', end:'bottom top', scrub:1,
+      onUpdate:self=>{ scrollChopBoost=self.progress; },
+      onEnter:()=>{ inRipplesSection=false; },
+    });
+    ScrollTrigger.create({
+      trigger:'#ripples', start:'top center', end:'bottom center',
+      onEnter:()=>{ inRipplesSection=true; }, onLeave:()=>{ inRipplesSection=false; },
+      onEnterBack:()=>{ inRipplesSection=true; }, onLeaveBack:()=>{ inRipplesSection=false; }
+    });
+    ScrollTrigger.create({
+      trigger:document.documentElement, start:'top top', end:'bottom bottom', scrub:1,
+      onUpdate:self=>{
+        const t=self.progress;
+        if (camera){
+          camera.position.x = Math.sin(t*TAU*0.5)*50;
+          camera.position.y = 280 - t*40;
+        }
+      }
+    });
+
+    gsap.utils.toArray('.text-panel').forEach(panel=>{
+      gsap.from(panel.querySelectorAll('.eyebrow, h2, p, .eq-tag'), {
+        opacity:0, y:24, duration:0.8, stagger:0.08, ease:'power3.out',
+        scrollTrigger:{ trigger:panel, start:'top 70%' }
+      });
+    });
+    gsap.from('#droplets .droplet-head > *', {
+      opacity:0, y:20, duration:0.8, stagger:0.1, ease:'power3.out',
+      scrollTrigger:{ trigger:'#droplets', start:'top 65%' }
+    });
+  }
+
+  /* ===================== lenis (optional smooth scroll) ===================== */
+  function initLenis(){
+    if (!window.Lenis) return;
+    try{
+      lenis = new Lenis({ duration:1.1, smoothWheel:true, easing:t=>1-Math.pow(1-t,3) });
+      if (window.gsap && window.ScrollTrigger){
+        lenis.on('scroll', ScrollTrigger.update);
+        gsap.ticker.add((time)=>{ lenis.raf(time*1000); });
+        gsap.ticker.lagSmoothing(0);
+      } else {
+        const raf=(time)=>{ lenis.raf(time); requestAnimationFrame(raf); };
+        requestAnimationFrame(raf);
+      }
+    }catch(err){ console.warn('Lenis init failed, native scroll will be used.', err); lenis=null; }
+  }
+
+  /* ===================== droplet playground (Matter.js + CSS goo filter) ===================== */
+  function createDroplet(x,y,r){
+    const d = Matter.Bodies.circle(x,y,r,{ restitution:0.25, friction:0.05, frictionAir:0.012, density:0.0018 });
+    d.hue = 178+Math.random()*40;
+    return d;
+  }
+  function spawnDroplets(){
+    const w=dropletCanvas.width, h=dropletCanvas.height;
+    const count=14;
+    for (let i=0;i<count;i++){
+      const x=w*0.15+Math.random()*w*0.7;
+      const y=h*0.1+Math.random()*h*0.5;
+      const r=9+Math.random()*13;
+      const d=createDroplet(x,y,r);
+      droplets.push(d);
+      Matter.Composite.add(dropletWorld,d);
+    }
+  }
+  function resetDropletPlayground(){
+    if (!dropletWorld) return;
+    droplets.forEach(d=>Matter.Composite.remove(dropletWorld,d));
+    droplets=[];
+    spawnDroplets();
+  }
+  function resizeDropletWorld(){
+    if (!dropletCanvas) return;
+    const rect = dropletCanvas.parentElement.getBoundingClientRect();
+    dropletCanvas.width = Math.max(rect.width,280);
+    dropletCanvas.height = Math.max(rect.height,360);
+    if (dropletWorld){
+      dropletWalls.forEach(w=>Matter.Composite.remove(dropletWorld,w));
+      const t=60, w=dropletCanvas.width, h=dropletCanvas.height;
+      dropletWalls = [
+        Matter.Bodies.rectangle(w/2,-t/2,w+t*2,t,{isStatic:true}),
+        Matter.Bodies.rectangle(w/2,h+t/2,w+t*2,t,{isStatic:true}),
+        Matter.Bodies.rectangle(-t/2,h/2,t,h+t*2,{isStatic:true}),
+        Matter.Bodies.rectangle(w+t/2,h/2,t,h+t*2,{isStatic:true})
+      ];
+      Matter.Composite.add(dropletWorld, dropletWalls);
+    }
+  }
+  function applySurfaceTensionForces(){
+    const n=droplets.length;
+    for (let i=0;i<n;i++){
+      for (let j=i+1;j<n;j++){
+        const a=droplets[i], b=droplets[j];
+        const dx=b.position.x-a.position.x, dy=b.position.y-a.position.y;
+        const dist=Math.sqrt(dx*dx+dy*dy)||1;
+        const reach=(a.circleRadius+b.circleRadius)*3.2;
+        const touch=(a.circleRadius+b.circleRadius)*0.9;
+        if (dist<reach && dist>touch){
+          const strength = SURFACE_TENSION_STRENGTH*(1-dist/reach)/dist;
+          const fx=dx*strength*0.00028, fy=dy*strength*0.00028;
+          Matter.Body.applyForce(a, a.position, { x:fx, y:fy });
+          Matter.Body.applyForce(b, b.position, { x:-fx, y:-fy });
+        }
+      }
+    }
+  }
+  function drawDroplets(){
+    const ctx=dropletCtx;
+    ctx.clearRect(0,0,dropletCanvas.width,dropletCanvas.height);
+    droplets.forEach(d=>{
+      ctx.beginPath();
+      ctx.arc(d.position.x, d.position.y, d.circleRadius, 0, TAU);
+      ctx.fillStyle = `hsl(${d.hue},70%,58%)`;
+      ctx.fill();
+    });
+  }
+  function initDropletPlayground(){
+    if (!window.Matter) return;
+    dropletCanvas = document.getElementById('droplet-canvas');
+    if (!dropletCanvas) return;
+    dropletCtx = dropletCanvas.getContext('2d');
+
+    matterEngine = Matter.Engine.create();
+    dropletWorld = matterEngine.world;
+    matterEngine.gravity.y = 0.65;
+
+    resizeDropletWorld();
+    spawnDroplets();
+    Matter.Events.on(matterEngine, 'beforeUpdate', applySurfaceTensionForces);
+
+    const mouse = Matter.Mouse.create(dropletCanvas);
+    mouse.pixelRatio = window.devicePixelRatio || 1;
+    const mouseConstraint = Matter.MouseConstraint.create(matterEngine, { mouse, constraint:{ stiffness:0.15, damping:0.1 } });
+    Matter.Composite.add(dropletWorld, mouseConstraint);
+
+    document.getElementById('btn-droplet-reset')?.addEventListener('click', resetDropletPlayground);
+    document.getElementById('btn-droplet-gravity')?.addEventListener('click', ()=>{ matterEngine.gravity.y *= -1; });
+  }
+  function updateDropletPlayground(dt){
+    if (!matterEngine || !dropletCanvas) return;
+    Matter.Engine.update(matterEngine, Math.min(dt*1000,33));
+    drawDroplets();
+  }
+
+  /* ===================== flubber morph blob (nav mark, with fallback) ===================== */
+  function generateBlobPath(cx,cy,baseR,pointCount,seedOffset){
+    const pts=[];
+    for (let i=0;i<pointCount;i++){
+      const a=(i/pointCount)*TAU;
+      const n=hashRand(i*7.13+seedOffset)*0.4+0.8;
+      const r=baseR*n;
+      pts.push([cx+Math.cos(a)*r, cy+Math.sin(a)*r]);
+    }
+    const mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2];
+    let d='';
+    const start=mid(pts[pts.length-1],pts[0]);
+    d+=`M ${start[0].toFixed(2)} ${start[1].toFixed(2)} `;
+    for (let i=0;i<pts.length;i++){
+      const cur=pts[i], next=pts[(i+1)%pts.length];
+      const m=mid(cur,next);
+      d+=`Q ${cur[0].toFixed(2)} ${cur[1].toFixed(2)} ${m[0].toFixed(2)} ${m[1].toFixed(2)} `;
+    }
+    d+='Z';
+    return d;
+  }
+  function setupMorphFallback(pathEl, shapes){
+    let idx=0;
+    setInterval(()=>{
+      idx=(idx+1)%shapes.length;
+      if (window.gsap){
+        gsap.to(pathEl,{ opacity:0, duration:0.4, onComplete:()=>{
+          pathEl.setAttribute('d', shapes[idx]);
+          gsap.to(pathEl,{ opacity:1, duration:0.4 });
+        }});
+      } else { pathEl.setAttribute('d', shapes[idx]); }
+    }, 2600);
+  }
+  function initMorphBlob(){
+    const pathEl=document.getElementById('morph-path');
+    if (!pathEl) return;
+    const shapes=[ generateBlobPath(100,100,70,9,1), generateBlobPath(100,100,70,9,47), generateBlobPath(100,100,70,9,133) ];
+    pathEl.setAttribute('d', shapes[0]);
+    if (window.flubber){
+      try{
+        let idx=0;
+        const morphNext=()=>{
+          const from=shapes[idx%shapes.length];
+          const to=shapes[(idx+1)%shapes.length];
+          const interp=flubber.interpolate(from,to,{ maxSegmentLength:4 });
+          const state={ t:0 };
+          if (window.gsap){
+            gsap.to(state,{ t:1, duration:1.8, ease:'power2.inOut',
+              onUpdate:()=>pathEl.setAttribute('d', interp(state.t)),
+              onComplete:()=>{ idx++; setTimeout(morphNext,900); }
+            });
+          } else { pathEl.setAttribute('d',to); idx++; setTimeout(morphNext,2200); }
+        };
+        morphNext();
+        return;
+      }catch(err){ console.warn('Flubber morph failed, using crossfade fallback.', err); }
+    }
+    setupMorphFallback(pathEl, shapes);
+  }
+
+  /* ===================== preloader / hero reveal ===================== */
+  function splitHeadline(){
+    const headline=document.querySelector('.hero-headline');
+    if (!headline) return;
+    const words=headline.textContent.trim().split(/\s+/);
+    headline.innerHTML=words.map(w=>`<span class="word"><span class="word-inner">${w}</span></span>`).join(' ');
+  }
+  function revealHero(){
+    const wordInners=document.querySelectorAll('.hero-headline .word-inner');
+    if (window.gsap){
+      gsap.set(wordInners,{ yPercent:120 });
+      gsap.to(wordInners,{ yPercent:0, duration:1.1, stagger:0.045, ease:'power4.out', delay:0.1 });
+      gsap.from('.hero-sub',{ opacity:0, y:20, duration:1, delay:0.5, ease:'power3.out' });
+      gsap.from('.scroll-cue',{ opacity:0, duration:1, delay:1.1 });
+      gsap.from('.nav-logo',{ opacity:0, y:-10, duration:0.8, delay:0.2, ease:'power3.out' });
+    } else {
+      wordInners.forEach(w=>w.style.transform='translateY(0)');
+    }
+    if (window.anime){
+      anime({ targets:'.nav-link', translateY:[16,0], opacity:[0,1], delay:anime.stagger(70,{start:300}), easing:'easeOutElastic(1,.7)', duration:900 });
+    } else {
+      document.querySelectorAll('.nav-link').forEach(el=>el.style.opacity='1');
+    }
+  }
+  function runPreloader(onComplete){
+    const fill=document.querySelector('.pre-bar-fill');
+    const percent=document.querySelector('.pre-percent');
+    const dur=prefersReducedMotion?0.3:1.6;
+    const state={ p:0 };
+    const finish=()=>{
+      const pre=document.getElementById('preloader');
+      if (window.gsap){
+        gsap.to(pre,{ opacity:0, duration:0.7, ease:'power2.out', onComplete:()=>{ pre.style.display='none'; onComplete(); } });
+      } else {
+        pre.style.transition='opacity .6s'; pre.style.opacity='0';
+        setTimeout(()=>{ pre.style.display='none'; onComplete(); },650);
+      }
+    };
+    if (window.gsap){
+      gsap.to(state,{ p:100, duration:dur, ease:'power2.inOut',
+        onUpdate:()=>{ const v=Math.round(state.p); if(fill) fill.style.width=v+'%'; if(percent) percent.textContent=v+'%'; },
+        onComplete:finish
+      });
+    } else {
+      let v=0;
+      const iv=setInterval(()=>{
+        v+=6; if(fill) fill.style.width=Math.min(v,100)+'%'; if(percent) percent.textContent=Math.min(v,100)+'%';
+        if (v>=100){ clearInterval(iv); finish(); }
+      },60);
+    }
+  }
+
+  /* ===================== dock controls ===================== */
+  function initDockControls(){
+    document.querySelectorAll('.mode-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>selectSeaState(btn.dataset.sea));
+    });
+    const windSlider=document.getElementById('slider-wind');
+    windSlider?.addEventListener('input', e=>{
+      windMultiplier=parseFloat(e.target.value)/100;
+      document.getElementById('lbl-wind').textContent=e.target.value;
+      updateHUDReadout();
+    });
+    const swellSlider=document.getElementById('slider-swell');
+    swellSlider?.addEventListener('input', e=>{
+      swellMultiplier=parseFloat(e.target.value)/100;
+      document.getElementById('lbl-swell').textContent=e.target.value;
+      updateHUDReadout();
+    });
+    const currentSlider=document.getElementById('slider-current');
+    currentSlider?.addEventListener('input', e=>{
+      driftSpeed=parseFloat(e.target.value)/100*1.4;
+      document.getElementById('lbl-current').textContent=e.target.value;
+    });
+    const btnRipples=document.getElementById('btn-ripples');
+    btnRipples?.addEventListener('click', ()=>{
+      ripplesEnabled=!ripplesEnabled;
+      btnRipples.textContent='Ripples: '+(ripplesEnabled?'On':'Off');
+    });
+    document.getElementById('btn-splash')?.addEventListener('click', ()=>{
+      for (let n=0;n<3;n++){
+        const x0=(Math.random()-0.5)*OCEAN_WIDTH*0.7;
+        const z0=(Math.random()-0.5)*OCEAN_DEPTH*0.7;
+        injectRippleImpulse(x0,z0,14+Math.random()*8);
+        spawnFoam(x0,4,z0,20,3.2);
+      }
+    });
+  }
+
+  /* ===================== resize ===================== */
+  function onResize(){
+    if (webglSupported && renderer && camera){
+      const w=window.innerWidth, h=window.innerHeight;
+      camera.aspect=w/h; camera.updateProjectionMatrix();
+      renderer.setSize(w,h);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+      if (foamMaterial) foamMaterial.uniforms.uPixelRatio.value=Math.min(window.devicePixelRatio,2);
+    }
+    resizeDropletWorld();
+  }
+
+  /* ===================== main loop ===================== */
+  function tick(now){
+    const dt=Math.min((now-lastTime)/1000,0.05);
+    lastTime=now;
+    const t=now/1000;
+
+    updateRipples();
+    updateOcean(t);
+    updateFoam(dt);
+    spawnAmbientFoam(t);
+
+    if (inRipplesSection && !prefersReducedMotion){
+      autoImpulseTimer+=dt;
+      if (autoImpulseTimer>2.2){
+        autoImpulseTimer=0;
+        const x0=(Math.random()-0.5)*OCEAN_WIDTH*0.5;
+        const z0=(Math.random()-0.5)*OCEAN_DEPTH*0.5;
+        injectRippleImpulse(x0,z0,10);
+        spawnFoam(x0,3,z0,10,2.2);
+      }
+    }
+
+    if (webglSupported && camera && scene && renderer){
+      if (oceanMaterial) oceanMaterial.uniforms.uTime.value=t;
+      renderer.render(scene,camera);
+    }
+
+    updateDropletPlayground(dt);
+
+    const instFps=1/Math.max(dt,0.0001);
+    fpsSmoothed += (instFps-fpsSmoothed)*0.05;
+    const fpsEl=document.getElementById('hud-fps');
+    if (fpsEl) fpsEl.textContent=Math.round(fpsSmoothed);
+
+    requestAnimationFrame(tick);
+  }
+
+  /* ===================== init ===================== */
+  function init(){
+    splitHeadline();
+    initRippleField();
+    initScene();
+    initDropletPlayground();
+    initMorphBlob();
+    initSeaStateMachine();
+    initDockControls();
+    initScrollytelling();
+    initLenis();
+    setupCursor();
+    bindHoverElements();
+    updateHUDReadout();
+    window.addEventListener('pointermove', onPointerMove, { passive:true });
+    window.addEventListener('pointerdown', onPointerDown, { passive:true });
+    window.addEventListener('pointerup', ()=>{ pointerDown=false; }, { passive:true });
+    window.addEventListener('resize', onResize);
+
+    runPreloader(()=>{ revealHero(); });
+    requestAnimationFrame(tick);
+  }
+
+  try{ init(); }catch(err){ console.error('Swell init error:', err); }
+  </script>
+</body>
+</html>
