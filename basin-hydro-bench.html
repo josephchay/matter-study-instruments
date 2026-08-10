@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>BASIN · hydrodynamics bench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Martian+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+/* ============================================================
+   BASIN — hydrodynamics bench · experiment 03
+   Field: ultramarine tank · graph backdrop refracted by fluid.
+   Fluid: cream milk body → apricot where kinetic.
+   Chrome: bone ink · signal-orange controls (sparingly).
+   Type: Bricolage Grotesque (display) / Martian Mono (readouts)
+   ============================================================ */
+:root{
+  --field:#1b2aa6;
+  --field-hi:#2c3fd1;
+  --bone:#e9ecf8;
+  --dim:rgba(233,236,248,.46);
+  --faint:rgba(233,236,248,.16);
+  --sig:#ff6a3d;
+  --milk:#f2ead9;
+  --mono:'Martian Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --disp:'Bricolage Grotesque', system-ui, sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--field);
+  color:var(--bone);
+  font-family:var(--mono);
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+body.fine{cursor:none}
+body.fine button{cursor:none}
+
+/* -------- stage layers -------- */
+#gl{position:fixed;inset:0;z-index:1}
+#gl canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#overlay{position:fixed;inset:0;z-index:2;pointer-events:none}
+#vig{position:fixed;inset:0;z-index:3;pointer-events:none;
+  background:radial-gradient(ellipse 120% 105% at 50% 42%, transparent 58%, rgba(6,10,46,.5) 100%)}
+#grain{position:fixed;inset:0;z-index:4;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* -------- chrome -------- */
+.chrome{position:fixed;z-index:10;font-size:10px;letter-spacing:.14em;text-transform:uppercase}
+.pre [data-ui]{opacity:0}
+header.chrome{top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-start;padding:20px 24px 0}
+.brand{display:flex;align-items:baseline;gap:13px}
+.brand .mark{font-family:var(--disp);font-weight:800;font-size:19px;letter-spacing:.2em;color:var(--bone)}
+.brand .mark i{font-style:normal;color:var(--sig)}
+.brand .sub{color:var(--dim)}
+#tele{display:flex;gap:20px;text-align:right;color:var(--dim)}
+#tele .cell{display:flex;flex-direction:column;gap:3px;align-items:flex-end}
+#tele b{color:var(--bone);font-weight:700;font-size:11px}
+#tele .cell span:last-child{font-size:8.5px}
+
+/* -------- tilt dial (right edge protractor) -------- */
+#dial{position:fixed;right:18px;top:50%;transform:translateY(-50%);z-index:10;width:74px;height:190px}
+#dial svg{width:100%;height:100%;overflow:visible}
+#dial .arc{fill:none;stroke:var(--faint);stroke-width:1}
+#dial .tick{stroke:var(--faint);stroke-width:1}
+#dial .tick.maj{stroke:var(--dim)}
+#dial #needle{stroke:var(--sig);stroke-width:2;filter:drop-shadow(0 0 5px rgba(255,106,61,.7))}
+#dial #d-read{position:absolute;right:2px;top:100%;margin-top:8px;color:var(--bone);font-size:10px;letter-spacing:.1em;white-space:nowrap}
+#dial #d-read em{font-style:normal;color:var(--dim);font-size:8.5px}
+
+/* -------- console -------- */
+footer.chrome{bottom:0;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-end;padding:0 24px 20px;gap:16px}
+#state-line{display:flex;flex-direction:column;gap:7px;min-width:0}
+#st-tag{color:var(--sig);font-size:9.5px;letter-spacing:.26em}
+#st-name{font-family:var(--disp);font-weight:800;font-size:clamp(19px,3vw,30px);letter-spacing:.1em;text-transform:uppercase;line-height:1;white-space:nowrap}
+#st-name .ch{display:inline-block}
+#st-note{color:var(--dim);font-size:8.5px;letter-spacing:.12em}
+#deck{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.seg{display:flex;border:1px solid var(--faint);background:rgba(10,16,74,.42);
+  -webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px)}
+.seg button{all:unset;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--dim);padding:9px 13px;transition:color .25s,background .25s}
+.seg button:hover{color:var(--bone)}
+.seg button.on{background:var(--sig);color:#20122b}
+.seg button:focus-visible{outline:1px solid var(--sig);outline-offset:2px}
+.key{all:unset;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--bone);border:1px solid var(--faint);padding:9px 13px;background:rgba(10,16,74,.42);
+  -webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);
+  transition:border-color .25s,color .25s,background .25s,transform .12s}
+.key:hover{border-color:var(--sig);color:var(--sig)}
+.key:active{transform:scale(.95)}
+.key.on{background:var(--sig);border-color:var(--sig);color:#20122b}
+.key:focus-visible{outline:1px solid var(--sig);outline-offset:2px}
+#k-pour.pouring{background:var(--milk);border-color:var(--milk);color:#1b2aa6}
+
+/* vessel glyph inside its key */
+#k-vessel svg{width:15px;height:15px;vertical-align:-3px;margin-right:7px}
+#k-vessel path{fill:none;stroke:currentColor;stroke-width:1.6}
+
+/* -------- hint -------- */
+#hint{position:fixed;left:50%;bottom:82px;transform:translateX(-50%);z-index:10;
+  font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);
+  padding:9px 16px;border:1px solid var(--faint);background:rgba(10,16,74,.5);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);white-space:nowrap}
+#hint b{color:var(--sig);font-weight:400}
+
+/* -------- boot -------- */
+#boot{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:26px;background:transparent;pointer-events:none}
+#boot .word{font-family:var(--disp);font-weight:800;font-size:clamp(46px,10vw,120px);
+  letter-spacing:.16em;text-indent:.16em;display:flex}
+#boot .word .ch{display:inline-block;opacity:0}
+#boot .word .ch.sig{color:var(--sig)}
+#boot #fill-read{font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--dim)}
+#boot #fill-read b{color:var(--bone)}
+
+/* -------- cursor: caliper -------- */
+#cal{position:fixed;top:0;left:0;z-index:60;pointer-events:none;display:none;will-change:transform}
+body.fine #cal{display:block}
+#cal svg{overflow:visible}
+#cal circle{fill:none;stroke:var(--bone);stroke-opacity:.75;stroke-width:1}
+#cal.grab circle{stroke:var(--sig);stroke-dasharray:4 5}
+#cal line{stroke:var(--bone);stroke-opacity:.75;stroke-width:1}
+
+#nogl{position:fixed;inset:0;z-index:99;display:none;align-items:center;justify-content:center;
+  text-align:center;padding:40px;font-size:11px;letter-spacing:.12em;line-height:2.2;color:var(--dim)}
+
+@media (max-width:760px){
+  header.chrome{padding:14px 14px 0}
+  #tele .cell:nth-child(2){display:none}
+  #dial{display:none}
+  footer.chrome{padding:0 14px 14px;flex-direction:column;align-items:stretch;gap:10px}
+  #deck{justify-content:flex-start}
+  .seg button,.key{padding:8px 10px}
+  #hint{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .pre [data-ui]{opacity:1}
+}
+</style>
+</head>
+<body class="pre">
+
+<div id="gl" aria-hidden="true"></div>
+<canvas id="overlay" aria-hidden="true"></canvas>
+<div id="vig" aria-hidden="true"></div>
+<div id="grain" aria-hidden="true"></div>
+
+<header class="chrome">
+  <div class="brand" data-ui>
+    <span class="mark">BAS<i>I</i>N</span>
+    <span class="sub">hydrodynamics bench · exp.03</span>
+  </div>
+  <div id="tele" data-ui>
+    <div class="cell"><b id="t-n">—</b><span>particles</span></div>
+    <div class="cell"><b id="t-sim">—</b><span>sim / ms</span></div>
+    <div class="cell"><b id="t-fps">—</b><span>fps</span></div>
+  </div>
+</header>
+
+<div id="dial" data-ui aria-hidden="true">
+  <svg viewBox="0 0 74 190">
+    <path class="arc" d="M 10 15 A 160 160 0 0 1 10 175" />
+    <g id="d-ticks"></g>
+    <line id="needle" x1="64" y1="95" x2="30" y2="95" />
+  </svg>
+  <div id="d-read"><span id="d-deg">0.0°</span> <em>tilt</em></div>
+</div>
+
+<footer class="chrome">
+  <div id="state-line" data-ui>
+    <span id="st-tag">MATTER · WATER</span>
+    <span id="st-name" aria-live="polite">WATER</span>
+    <span id="st-note">tait pressure · μ-viscosity 0.10 · ρ₀ 1.00 · xsph 0.08</span>
+  </div>
+  <div id="deck" data-ui>
+    <div class="seg" role="group" aria-label="matter presets">
+      <button id="m-water" class="on">water</button>
+      <button id="m-syrup">syrup</button>
+      <button id="m-gel">gel</button>
+    </div>
+    <button class="key" id="k-vessel"><svg viewBox="0 0 16 16"><path id="v-glyph" d=""/></svg><span>vessel</span></button>
+    <button class="key" id="k-pour" aria-pressed="false">pour</button>
+    <button class="key" id="k-float">float +</button>
+    <button class="key" id="k-slosh">slosh</button>
+    <button class="key" id="k-reset">reset</button>
+  </div>
+</footer>
+
+<div id="hint" data-ui><b>drag</b> tilt gravity · <b>wheel</b> fine tilt · <b>hold</b> stir / grab · <b>pour</b> add matter</div>
+
+<div id="boot" aria-hidden="true">
+  <div class="word" id="boot-word"></div>
+  <div id="fill-read">filling <b id="fill-n">0</b> / <span id="fill-max">—</span></div>
+</div>
+
+<div id="cal" aria-hidden="true">
+  <svg width="120" height="120" viewBox="-60 -60 120 120">
+    <circle id="cal-ring" r="26"/>
+    <line x1="-5" y1="0" x2="5" y2="0"/><line x1="0" y1="-5" x2="0" y2="5"/>
+  </svg>
+</div>
+
+<div id="nogl">BASIN needs WebGL + a modern browser.<br/>the tank could not be initialised on this device.</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+
+<script>
+/* ==================================================================
+   BASIN · hydrodynamics bench — experiment 03
+   ------------------------------------------------------------------
+   MODULES
+     MACHINE  – XState-style statechart (boot → bench, pour flag)
+     MORPH    – flubber-style equal-arc resampling + interpolation
+     VESSELS  – four container polygons morphed live; interior
+                signed-distance-field grid rebuilt during morphs,
+                sampled bilinearly for particle & body collision
+     SPH      – smoothed-particle hydrodynamics: poly6 density,
+                spiky pressure gradient, μ-viscosity laplacian,
+                Tait-style equation of state, pairwise cohesion,
+                XSPH smoothing, symplectic Euler @ fixed substeps,
+                uniform-grid neighbour search (counting buckets)
+     FLOATS   – Matter.js rigid discs coupled both ways: buoyancy
+                from sampled local density, drag from relative flow,
+                fluid pushed back by disc SDF + surface velocity
+     RENDER   – three.js screen-space fluid: gaussian splats into a
+                half-res target, threshold composite with pseudo-
+                normal rim light + graph-paper backdrop refracted
+                through ∇field (that's the distortion pass)
+     UI       – gsap/anime choreography, tilt dial, caliper cursor,
+                lenis-style inertial wheel→tilt smoothing
+   ================================================================== */
+(function () {
+'use strict';
+
+var docEl = document.documentElement;
+if (!window.THREE || !window.gsap) {
+  document.getElementById('nogl').style.display = 'flex';
+  document.body.classList.remove('pre');
+  return;
+}
+var HAS_ANIME  = !!window.anime;
+var HAS_MATTER = !!window.Matter;
+var RM   = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var FINE = window.matchMedia('(pointer: fine)').matches;
+if (FINE) document.body.classList.add('fine');
+
+var TAU = Math.PI * 2;
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+function lerp(a,b,t){ return a+(b-a)*t; }
+function smooth(t){ return t*t*(3-2*t); }
+function rand(a,b){ return a+Math.random()*(b-a); }
+
+/* ==================================================================
+   MACHINE — pocket statechart
+   ================================================================== */
+function createMachine(cfg){
+  var m = {
+    state: cfg.initial,
+    send: function (evt) {
+      var node = cfg.states[m.state];
+      var target = node.on && node.on[evt];
+      if (!target) return;
+      if (node.exit) node.exit();
+      m.state = target;
+      var next = cfg.states[target];
+      if (next.entry) next.entry();
+    }
+  };
+  var first = cfg.states[cfg.initial];
+  if (first.entry) first.entry();
+  return m;
+}
+
+/* ==================================================================
+   MORPH — flubber-style resample / mix (shared with vessel + glyph)
+   ================================================================== */
+var MORPH = (function () {
+  function resample(pts, M) {
+    var n = pts.length / 2, lens = [0], total = 0, i;
+    for (i = 0; i < n; i++) {
+      var x0 = pts[i*2], y0 = pts[i*2+1];
+      var x1 = pts[((i+1)%n)*2], y1 = pts[((i+1)%n)*2+1];
+      total += Math.hypot(x1-x0, y1-y0);
+      lens.push(total);
+    }
+    var out = new Float32Array(M*2), seg = 0;
+    for (i = 0; i < M; i++) {
+      var d = (i / M) * total;
+      while (seg < n - 1 && lens[seg+1] < d) seg++;
+      var l0 = lens[seg], l1 = lens[seg+1];
+      var f = l1 > l0 ? (d - l0) / (l1 - l0) : 0;
+      var a = seg % n, b = (seg + 1) % n;
+      out[i*2]   = lerp(pts[a*2],   pts[b*2],   f);
+      out[i*2+1] = lerp(pts[a*2+1], pts[b*2+1], f);
+    }
+    return out;
+  }
+  function mix(a, b, t, out) {
+    for (var i = 0; i < a.length; i++) out[i] = a[i] + (b[i] - a[i]) * t;
+    return out;
+  }
+  function toPath(pts, sx, sy) {
+    var d = '', M = pts.length / 2;
+    for (var i = 0; i < M; i++) {
+      d += (i===0?'M':'L') + (pts[i*2]*sx).toFixed(2) + ' ' + (pts[i*2+1]*sy).toFixed(2);
+    }
+    return d + 'Z';
+  }
+  return { resample: resample, mix: mix, toPath: toPath };
+})();
+
+/* ==================================================================
+   VESSELS — container shapes in sim units (y: 0 top → 1 bottom,
+   x: 0 → A aspect). Interiors hold the fluid; walls above y≈0
+   run off-screen so every vessel reads as open-topped.
+   ================================================================== */
+var SIM = { A: 1.6 };                    // aspect, refreshed on resize
+var VESSELS = (function () {
+  var M = 88;                            // resampled wall points
+  function pts(arr){ return MORPH.resample(new Float32Array(arr), M); }
+
+  /* each generator returns a closed CCW polygon in unit space,
+     expressed with A as a free variable → regenerated on resize */
+  /* cleaner: build via arc helper */
+  function arc(a, cx, cy, r, a0, a1, n){
+    for (var i=0;i<=n;i++){ var t=a0+(a1-a0)*i/n; a.push(cx+Math.cos(t)*r, cy+Math.sin(t)*r); }
+  }
+  function shapeBasin(A){
+    var cx=A/2, w=A*0.62, hw=w/2, bot=0.88, r=0.10, top=-0.35;
+    var a=[];
+    a.push(cx-hw, top);
+    a.push(cx-hw, bot-r);
+    arc(a, cx-hw+r, bot-r, r, Math.PI, Math.PI/2, 7);
+    a.push(cx+hw-r, bot);
+    arc(a, cx+hw-r, bot-r, r, Math.PI/2, 0, 7);
+    a.push(cx+hw, top);
+    return pts(a);
+  }
+  function shapeFlask(A){                // erlenmeyer: wide belly, narrow neck
+    var cx=A/2, bot=0.90, bw=A*0.56, nw=A*0.14, top=-0.35, sh=0.30;
+    var a=[];
+    a.push(cx-nw/2, top);
+    a.push(cx-nw/2, sh);
+    a.push(cx-bw/2, bot-0.06);
+    arc(a, cx-bw/2+0.07, bot-0.06, 0.07, Math.PI, Math.PI/2, 6);
+    a.push(cx+bw/2-0.07, bot);
+    arc(a, cx+bw/2-0.07, bot-0.06, 0.07, Math.PI/2, 0, 6);
+    a.push(cx+bw/2, bot-0.06);
+    a.push(cx+nw/2, sh);
+    a.push(cx+nw/2, top);
+    return pts(a);
+  }
+  function shapeTube(A){                 // U-tube: two columns, joined bend
+    var cx=A/2, colW=A*0.15, gap=A*0.20, bot=0.86, top=-0.35;
+    var Lo=cx-gap/2-colW, Li=cx-gap/2, Ri=cx+gap/2, Ro=cx+gap/2+colW;
+    var bendC=cx;
+    var a=[];
+    a.push(Lo, top);
+    a.push(Lo, bot-(Ro-Lo)/2);
+    arc(a, bendC, bot-(Ro-Lo)/2, (Ro-Lo)/2, Math.PI, 0, 16);      // outer bend
+    a.push(Ro, top);
+    a.push(Ri, top);
+    a.push(Ri, bot-(Ro-Lo)/2);
+    arc(a, bendC, bot-(Ro-Lo)/2, (Ri-Li)/2, 0, Math.PI, 12);      // inner bend (reverse)
+    a.push(Li, top);
+    return pts(a);
+  }
+  function shapeBowl(A){                 // wide hemispheric bowl on tall walls
+    var cx=A/2, top=-0.35, w=A*0.72, r=w/2, cy=0.86-r*0.55;
+    var a=[];
+    a.push(cx-r, top);
+    a.push(cx-r, cy);
+    arc(a, cx, cy, r, Math.PI, 0, 26);   // bowl belly (dips to cy+r)
+    a.push(cx+r, top);
+    return pts(a);
+  }
+
+  var GENS = [
+    { name:'basin', make:shapeBasin, note:'rounded tray · sdf collisions' },
+    { name:'flask', make:shapeFlask, note:'erlenmeyer taper · narrow neck' },
+    { name:'u-tube', make:shapeTube, note:'communicating columns · pascal' },
+    { name:'bowl',  make:shapeBowl,  note:'hemispheric section · slosh modes' }
+  ];
+
+  /* live wall polygon + SDF grid */
+  var cur = 0, wallA = null, wallB = null, wall = null, morphT = { t: 1 };
+  var GW = 112, GH = 72, sdf = new Float32Array(GW*GH);
+  var sdfDirty = true;
+
+  function rebuildShapes(){
+    var A = SIM.A;
+    wallA = wall ? wall.slice() : GENS[cur].make(A);
+    wallB = GENS[cur].make(A);
+    if (!wall) wall = wallB.slice();
+    sdfDirty = true;
+  }
+
+  function segDist(px,py, ax,ay, bx,by){
+    var vx=bx-ax, vy=by-ay, wx=px-ax, wy=py-ay;
+    var c1 = vx*wx+vy*wy;
+    if (c1<=0) return Math.hypot(px-ax,py-ay);
+    var c2 = vx*vx+vy*vy;
+    if (c2<=c1) return Math.hypot(px-bx,py-by);
+    var t=c1/c2;
+    return Math.hypot(px-(ax+vx*t), py-(ay+vy*t));
+  }
+  function inside(px,py,w){
+    var n=w.length/2, c=false;
+    for (var i=0,j=n-1;i<n;j=i++){
+      var xi=w[i*2], yi=w[i*2+1], xj=w[j*2], yj=w[j*2+1];
+      if (((yi>py)!==(yj>py)) && (px < (xj-xi)*(py-yi)/(yj-yi)+xi)) c=!c;
+    }
+    return c;
+  }
+  function buildSDF(){
+    var A=SIM.A, n=wall.length/2;
+    for (var gy=0; gy<GH; gy++){
+      var py = (gy/(GH-1))*1.02 - 0.01;
+      for (var gx=0; gx<GW; gx++){
+        var px = (gx/(GW-1))*A;
+        var d=1e9;
+        for (var i=0;i<n;i++){
+          var j=(i+1)%n;
+          var dd=segDist(px,py, wall[i*2],wall[i*2+1], wall[j*2],wall[j*2+1]);
+          if (dd<d) d=dd;
+        }
+        sdf[gy*GW+gx] = inside(px,py,wall) ? -d : d;
+      }
+    }
+    sdfDirty=false;
+  }
+
+  /* bilinear SDF sample + gradient (central difference on grid) */
+  var gStep = { x: 0, y: 0 };
+  function sample(px,py,out){
+    var A=SIM.A;
+    var fx = clamp(px/A,0,1)*(GW-1), fy = clamp((py+0.01)/1.02,0,1)*(GH-1);
+    var x0=Math.floor(fx), y0=Math.floor(fy);
+    var x1=Math.min(x0+1,GW-1), y1=Math.min(y0+1,GH-1);
+    var tx=fx-x0, ty=fy-y0;
+    var d00=sdf[y0*GW+x0], d10=sdf[y0*GW+x1], d01=sdf[y1*GW+x0], d11=sdf[y1*GW+x1];
+    var d = lerp(lerp(d00,d10,tx), lerp(d01,d11,tx), ty);
+    if (out){
+      var ex = A/(GW-1), ey = 1.02/(GH-1);
+      out.d = d;
+      out.nx = ( (lerp(d10,d11,ty)) - (lerp(d00,d01,ty)) ) / ex;
+      out.ny = ( (lerp(d01,d11,tx)) - (lerp(d00,d10,tx)) ) / ey;
+      var l = Math.hypot(out.nx,out.ny)||1;
+      out.nx/=l; out.ny/=l;
+    }
+    return d;
+  }
+
+  function next(onDone){
+    cur = (cur+1)%GENS.length;
+    wallA = wall.slice();
+    wallB = GENS[cur].make(SIM.A);
+    gsap.killTweensOf(morphT);
+    if (RM){
+      morphT.t = 1;
+      MORPH.mix(wallA, wallB, 1, wall);
+      sdfDirty = true;
+      if (onDone) onDone();
+    } else {
+      morphT.t = 0;
+      gsap.to(morphT, { t: 1, duration: 1.05, ease: 'elastic.out(1, 0.62)',
+        onUpdate: function(){ MORPH.mix(wallA, wallB, clamp(morphT.t,0,1), wall); sdfDirty=true; },
+        onComplete: function(){ MORPH.mix(wallA,wallB,1,wall); sdfDirty=true; if(onDone) onDone(); }
+      });
+    }
+    return GENS[cur];
+  }
+  function regen(){ /* on resize: rebuild target for current aspect */
+    wallB = GENS[cur].make(SIM.A);
+    wall = wallB.slice();
+    wallA = wallB.slice();
+    sdfDirty = true;
+  }
+  function ensure(){ if (sdfDirty) buildSDF(); }
+
+  return {
+    init: function(){ wall = GENS[cur].make(SIM.A); wallA = wall.slice(); wallB = wall.slice(); sdfDirty = true; },
+    next: next, regen: regen, ensure: ensure, sample: sample,
+    get wall(){ return wall; },
+    get info(){ return GENS[cur]; },
+    get morphing(){ return morphT.t < 1; }
+  };
+})();
+
+/* ==================================================================
+   SPH — the fluid solver
+   All positions in sim units: x∈[0,A], y∈[0,1] (y down = +gravity).
+   ================================================================== */
+var SPH = (function () {
+  var MOBILE = Math.min(window.innerWidth, window.innerHeight) < 640 || !FINE;
+  var NMAX = MOBILE ? 1500 : 3000;
+  var H = MOBILE ? 0.042 : 0.032;        // smoothing radius
+  var H2 = H*H;
+  /* 2-D kernel constants (Müller-style, 2-D normalisations) */
+  var POLY6 = 4/(Math.PI*Math.pow(H,8));
+  var SPIKY = -30/(Math.PI*Math.pow(H,5));
+  var VISC  = 40/(Math.PI*Math.pow(H,5));
+  var MASS = 1.0;
+
+  var P = {                               // live params (preset-tweened)
+    rho0: 220, k: 9.0, mu: 0.10, cohesion: 0.0,
+    xsph: 0.08, gAmp: 3.4, damp: 0.999, name:'water'
+  };
+  var PRESETS = {
+    water: { rho0:220, k:9.0,  mu:0.10, cohesion:0.0,  xsph:0.08, gAmp:3.4,
+             tag:'MATTER · WATER', note:'tait pressure · μ 0.10 · ρ₀ 1.00 · xsph 0.08' },
+    syrup: { rho0:235, k:7.0,  mu:0.85, cohesion:0.35, xsph:0.20, gAmp:2.6,
+             tag:'MATTER · SYRUP', note:'μ-viscosity 0.85 · cohesion 0.35 · slow pour' },
+    gel:   { rho0:255, k:5.2,  mu:1.35, cohesion:1.15, xsph:0.30, gAmp:2.2,
+             tag:'MATTER · GEL',   note:'pairwise cohesion 1.15 · holds shape · grab it' }
+  };
+
+  var N = 0;
+  var px = new Float32Array(NMAX), py = new Float32Array(NMAX);
+  var vx = new Float32Array(NMAX), vy = new Float32Array(NMAX);
+  var fx = new Float32Array(NMAX), fy = new Float32Array(NMAX);
+  var rho = new Float32Array(NMAX), prs = new Float32Array(NMAX);
+  var nvx = new Float32Array(NMAX), nvy = new Float32Array(NMAX);
+  var spd = new Float32Array(NMAX);
+
+  /* uniform grid — counting buckets */
+  var CELL = H;
+  var GX=1, GY=1, cellCount, cellStart, cellIdx, order;
+  function gridAlloc(){
+    GX = Math.max(2, Math.ceil(SIM.A / CELL));
+    GY = Math.max(2, Math.ceil(1.05 / CELL));
+    cellCount = new Int32Array(GX*GY);
+    cellStart = new Int32Array(GX*GY+1);
+    cellIdx   = new Int32Array(NMAX);
+    order     = new Int32Array(NMAX);
+  }
+  gridAlloc();
+  function cellOf(i){
+    var cx = clamp((px[i]/CELL)|0, 0, GX-1);
+    var cy = clamp((py[i]/CELL)|0, 0, GY-1);
+    return cy*GX+cx;
+  }
+  function buildGrid(){
+    cellCount.fill(0);
+    var i;
+    for (i=0;i<N;i++){ cellIdx[i]=cellOf(i); cellCount[cellIdx[i]]++; }
+    var s=0, c;
+    for (c=0;c<GX*GY;c++){ cellStart[c]=s; s+=cellCount[c]; }
+    cellStart[GX*GY]=s;
+    var cursor = cellStart.slice(0, GX*GY);
+    for (i=0;i<N;i++){ order[cursor[cellIdx[i]]++]=i; }
+  }
+
+  /* pointer paddle + grab (set by UI) */
+  var pad = { x:-9, y:-9, vx:0, vy:0, r:0.075, on:false, grab:0 };
+  /* tilt gravity (radians, 0 = straight down), smoothed by UI */
+  var tilt = { v: 0 };
+  var bq = [];                            // slosh burst queue {x,y,p}
+
+  var sdfS = { d:0, nx:0, ny:0 };
+
+  function densityPass(){
+    var i,oi,j,oj;
+    for (i=0;i<N;i++){ rho[i]=0; }
+    for (oi=0;oi<N;oi++){
+      i = order[oi];
+      var cx = clamp((px[i]/CELL)|0,0,GX-1), cy = clamp((py[i]/CELL)|0,0,GY-1);
+      var sum = 0;                        // includes self at r=0
+      for (var gy=Math.max(0,cy-1); gy<=Math.min(GY-1,cy+1); gy++){
+        for (var gx=Math.max(0,cx-1); gx<=Math.min(GX-1,cx+1); gx++){
+          var c=gy*GX+gx, s0=cellStart[c], s1=cellStart[c+1];
+          for (oj=s0;oj<s1;oj++){
+            j=order[oj];
+            var dx=px[i]-px[j], dy=py[i]-py[j];
+            var r2=dx*dx+dy*dy;
+            if (r2<H2){
+              var w=H2-r2;
+              sum += w*w*w;
+            }
+          }
+        }
+      }
+      rho[i]=MASS*POLY6*sum;
+      /* Tait-ish EOS, mild negative pressure allowed for cohesion */
+      var pr = P.k*(rho[i]/P.rho0 - 1);
+      prs[i] = pr < -0.28*P.k ? -0.28*P.k : pr;
+    }
+  }
+
+  function forcePass(){
+    var gx0 = Math.sin(tilt.v)*P.gAmp, gy0 = Math.cos(tilt.v)*P.gAmp;
+    var i,oi,j,oj;
+    for (oi=0;oi<N;oi++){
+      i=order[oi];
+      var fxi=gx0, fyi=gy0, nvxi=0, nvyi=0, nw=0;
+      var cx = clamp((px[i]/CELL)|0,0,GX-1), cy = clamp((py[i]/CELL)|0,0,GY-1);
+      for (var gy=Math.max(0,cy-1); gy<=Math.min(GY-1,cy+1); gy++){
+        for (var gxx=Math.max(0,cx-1); gxx<=Math.min(GX-1,cx+1); gxx++){
+          var c=gy*GX+gxx, s0=cellStart[c], s1=cellStart[c+1];
+          for (oj=s0;oj<s1;oj++){
+            j=order[oj];
+            if (j===i) continue;
+            var dx=px[i]-px[j], dy=py[i]-py[j];
+            var r2=dx*dx+dy*dy;
+            if (r2>=H2 || r2<1e-12) continue;
+            var r=Math.sqrt(r2), hr=H-r;
+            var inx=dx/r, iny=dy/r;
+            /* pressure (spiky gradient, symmetrised) */
+            var pterm = -MASS*(prs[i]+prs[j])*0.5 * SPIKY*hr*hr / Math.max(rho[j],1e-6);
+            fxi += pterm*inx; fyi += pterm*iny;
+            /* viscosity (laplacian) */
+            var vterm = P.mu*MASS*VISC*hr/Math.max(rho[j],1e-6);
+            fxi += (vx[j]-vx[i])*vterm;
+            fyi += (vy[j]-vy[i])*vterm;
+            /* cohesion band: attract at 0.5h..h (gel/syrup) */
+            if (P.cohesion>0 && r>0.5*H){
+              var cw = P.cohesion*Math.sin((r/H-0.5)*Math.PI*2)*2.0;
+              fxi -= inx*cw; fyi -= iny*cw;
+            }
+            /* xsph neighbour velocity gather */
+            var w2 = (H2-r2); w2=w2*w2*w2*POLY6*MASS/Math.max(rho[j],1e-6);
+            nvxi += (vx[j]-vx[i])*w2; nvyi += (vy[j]-vy[i])*w2; nw+=w2;
+          }
+        }
+      }
+      /* pointer paddle: push + stir; grab pulls (gel especially) */
+      if (pad.on){
+        var pdx=px[i]-pad.x, pdy=py[i]-pad.y;
+        var pr2=pdx*pdx+pdy*pdy, prr=pad.r*(1+pad.grab*0.9);
+        if (pr2 < prr*prr){
+          var pd=Math.sqrt(pr2)||1e-4, fall=1-pd/prr;
+          if (pad.grab>0){
+            fxi += (-pdx/pd)*fall*22*pad.grab + pad.vx*9*fall;
+            fyi += (-pdy/pd)*fall*22*pad.grab + pad.vy*9*fall;
+          } else {
+            fxi += (pdx/pd)*fall*6 + pad.vx*14*fall;
+            fyi += (pdy/pd)*fall*6 + pad.vy*14*fall;
+          }
+        }
+      }
+      /* slosh bursts */
+      for (var b=0;b<bq.length;b++){
+        var B=bq[b], bx=px[i]-B.x, by=py[i]-B.y;
+        var bl=Math.sqrt(bx*bx+by*by)+1e-4;
+        var bf=Math.exp(-bl*bl*26)*B.p;
+        fxi += bx/bl*bf; fyi += by/bl*bf;
+      }
+      fx[i]=fxi; fy[i]=fyi; nvx[i]=nvxi; nvy[i]=nvyi;
+    }
+    bq.length=0;
+  }
+
+  function integrate(dt){
+    VESSELS.ensure();
+    var PR = H*0.5;                       // particle radius vs wall
+    for (var i=0;i<N;i++){
+      vx[i]=(vx[i]+fx[i]*dt + nvx[i]*P.xsph)*P.damp;
+      vy[i]=(vy[i]+fy[i]*dt + nvy[i]*P.xsph)*P.damp;
+      var sp2=vx[i]*vx[i]+vy[i]*vy[i];
+      if (sp2>9){ var s=3/Math.sqrt(sp2); vx[i]*=s; vy[i]*=s; }
+      px[i]+=vx[i]*dt; py[i]+=vy[i]*dt;
+      /* vessel SDF collision */
+      VESSELS.sample(px[i], py[i], sdfS);
+      if (sdfS.d > -PR){
+        var pen = sdfS.d + PR;
+        px[i] -= sdfS.nx*pen; py[i] -= sdfS.ny*pen;
+        var vn = vx[i]*sdfS.nx + vy[i]*sdfS.ny;
+        if (vn>0){
+          vx[i] -= sdfS.nx*vn*1.15;       // restitution 0.15
+          vy[i] -= sdfS.ny*vn*1.15;
+        }
+        vx[i]*=0.94; vy[i]*=0.94;         // wall friction
+      }
+      /* hard screen belt & catch-all */
+      if (py[i]>1.15){ py[i]=0.05; px[i]=SIM.A/2+rand(-0.05,0.05); vx[i]=0; vy[i]=0; }
+      if (px[i]<-0.15) px[i]=-0.15;
+      if (px[i]>SIM.A+0.15) px[i]=SIM.A+0.15;
+      if (py[i]<-0.5) { py[i]=-0.5; if (vy[i]<0) vy[i]=0; }
+      spd[i]=Math.sqrt(vx[i]*vx[i]+vy[i]*vy[i]);
+    }
+  }
+
+  var emitter = { on:false, acc:0 };
+  var recycle = 0;
+  function emit(dt){
+    if (!emitter.on) return;
+    emitter.acc += dt*(MOBILE?260:420);
+    var spoutX = SIM.A/2, spoutY = -0.06;
+    while (emitter.acc>=1){
+      emitter.acc-=1;
+      var i;
+      if (N<NMAX){ i=N++; }
+      else { i=recycle; recycle=(recycle+1)%NMAX; }
+      px[i]=spoutX+rand(-0.016,0.016); py[i]=spoutY+rand(-0.01,0.01);
+      vx[i]=rand(-0.05,0.05); vy[i]=rand(0.9,1.25);
+    }
+  }
+
+  function seed(count, settled){
+    N=0;
+    var A=SIM.A;
+    var cols = Math.ceil(Math.sqrt(count*A*0.7));
+    var gap = H*0.62;
+    var x0 = A/2 - cols*gap/2, y0 = settled?0.86:0.5;
+    var i=0;
+    outer:
+    for (var row=0; row<200; row++){
+      for (var col=0; col<cols; col++){
+        if (i>=count) break outer;
+        var xx = x0+col*gap+rand(-0.004,0.004);
+        var yy = y0-row*gap+rand(-0.004,0.004);
+        if (VESSELS.sample(xx,yy,null) < -H*0.6){
+          px[i]=xx; py[i]=yy; vx[i]=0; vy[i]=0; i++;
+        }
+      }
+    }
+    N=i;
+  }
+
+  function substep(dt){
+    buildGrid();
+    densityPass();
+    forcePass();
+    integrate(dt);
+  }
+  function step(frameDt){
+    emit(frameDt);
+    var sub = MOBILE?1:2;
+    var dt = clamp(frameDt, 0.004, 0.026)/sub;
+    for (var s=0;s<sub;s++) substep(dt);
+  }
+
+  function setPreset(name, instant){
+    var q = PRESETS[name]; if(!q) return null;
+    P.name=name;
+    if (instant){
+      P.rho0=q.rho0; P.k=q.k; P.mu=q.mu; P.cohesion=q.cohesion;
+      P.xsph=q.xsph; P.gAmp=q.gAmp;
+    } else {
+      gsap.to(P, { rho0:q.rho0, k:q.k, mu:q.mu, cohesion:q.cohesion,
+                   xsph:q.xsph, gAmp:q.gAmp, duration:0.9, ease:'sine.inOut' });
+    }
+    return q;
+  }
+
+  return {
+    step: step, seed: seed, setPreset: setPreset,
+    get N(){ return N; }, set N(v){ N=v; },
+    NMAX: NMAX, H: H, MOBILE: MOBILE,
+    px:px, py:py, vx:vx, vy:vy, spd:spd, rho:rho,
+    pad: pad, tilt: tilt, burst: function(x,y,p){ bq.push({x:x,y:y,p:p}); },
+    emitter: emitter, P: P, PRESETS: PRESETS,
+    gridAlloc: gridAlloc
+  };
+})();
+
+/* ==================================================================
+   FLOATS — Matter.js rigid discs, two-way coupled to the fluid
+   ================================================================== */
+var FLOATS = (function () {
+  if (!HAS_MATTER) return null;
+  var Engine=Matter.Engine, Bodies=Matter.Bodies, Body=Matter.Body,
+      Composite=Matter.Composite;
+  var engine=Engine.create(), list=[], MAXF=8;
+  engine.gravity.scale = 0.001;
+
+  var sdfF = { d:0, nx:0, ny:0 };
+  function add(){
+    if (list.length>=MAXF) { var old=list.shift(); Composite.remove(engine.world, old.b); }
+    var r = rand(0.035, 0.06);
+    var b = Bodies.circle((SIM.A/2+rand(-0.1,0.1))*PXS(), 0.06*PXS(), r*PXS(), {
+      restitution: 0.35, frictionAir: 0.012, density: rand(0.0006,0.0012)
+    });
+    Body.setAngularVelocity(b, rand(-0.1,0.1));
+    list.push({ b:b, r:r });
+    Composite.add(engine.world, b);
+  }
+  function PXS(){ return window.innerHeight; }  // sim unit → px scale
+
+  function step(dt){
+    if (!list.length) { Engine.update(engine, clamp(dt*1000,4,33)); return; }
+    var S=PXS(), H=SPH.H;
+    engine.gravity.x = Math.sin(SPH.tilt.v);
+    engine.gravity.y = Math.cos(SPH.tilt.v);
+    /* fluid → body: sample density + mean flow inside disc */
+    for (var f=0; f<list.length; f++){
+      var F=list[f], b=F.b;
+      var bx=b.position.x/S, by=b.position.y/S, br=F.r;
+      var cnt=0, mvx=0, mvy=0;
+      for (var i=0;i<SPH.N;i++){
+        var dx=SPH.px[i]-bx, dy=SPH.py[i]-by;
+        var rr=br+H*0.5;
+        if (dx*dx+dy*dy < rr*rr){
+          cnt++; mvx+=SPH.vx[i]; mvy+=SPH.vy[i];
+          /* body → fluid: push particles out of the disc */
+          var d=Math.sqrt(dx*dx+dy*dy)||1e-4;
+          if (d<br){
+            var push=(br-d);
+            SPH.px[i]+=dx/d*push; SPH.py[i]+=dy/d*push;
+            SPH.vx[i]=SPH.vx[i]*0.5 + b.velocity.x/S*0.5;
+            SPH.vy[i]=SPH.vy[i]*0.5 + b.velocity.y/S*0.5;
+          }
+        }
+      }
+      var submerged = clamp(cnt/24, 0, 1.35);
+      /* buoyancy: counter-gravity in native Matter force units,
+         >1× when fully submerged so discs bob up */
+      var g = engine.gravity, buoy = engine.gravity.scale * b.mass * submerged * 1.5;
+      Body.applyForce(b, b.position, { x:-g.x*buoy, y:-g.y*buoy });
+      if (cnt>0){
+        mvx/=cnt; mvy/=cnt;
+        var relx=mvx*S-b.velocity.x, rely=mvy*S-b.velocity.y;
+        var dragC = 0.00011 * b.mass * submerged;
+        Body.applyForce(b, b.position, { x:relx*dragC, y:rely*dragC });
+        Body.setAngularVelocity(b, b.angularVelocity*0.985 + relx*0.00004);
+      }
+      /* keep discs inside the vessel via the same SDF */
+      VESSELS.sample(bx, by, sdfF);
+      if (sdfF.d > -F.r){
+        var pen=sdfF.d+F.r;
+        Body.setPosition(b,{ x:(bx-sdfF.nx*pen)*S, y:(by-sdfF.ny*pen)*S });
+        var vn=b.velocity.x*sdfF.nx+b.velocity.y*sdfF.ny;
+        if (vn>0) Body.setVelocity(b,{ x:b.velocity.x-sdfF.nx*vn*1.4,
+                                       y:b.velocity.y-sdfF.ny*vn*1.4 });
+      }
+      if (by>1.3){ Body.setPosition(b,{x:SIM.A/2*S, y:0.05*S}); Body.setVelocity(b,{x:0,y:0}); }
+    }
+    Engine.update(engine, clamp(dt*1000,4,33));
+  }
+  return { add:add, step:step, list:list,
+           clear:function(){ list.forEach(function(F){Composite.remove(engine.world,F.b);}); list.length=0; } };
+})();
+
+/* ==================================================================
+   RENDER — screen-space fluid (three.js)
+   splat pass: gaussian points → half-res RT (alpha field + speed)
+   composite: threshold surface, rim light, graph backdrop refracted
+   through the field gradient (the distortion pass)
+   ================================================================== */
+var RENDER = (function () {
+  var renderer, rtScene, rtCam, compScene, ptsGeom, ptsMat, compMat, rt;
+  var posAttr, spdAttr;
+  var RTSCALE = 0.5;
+
+  var PTS_VS = [
+    'attribute float aSpd;',
+    'uniform float uPx;',
+    'uniform float uAspect;',
+    'varying float vSpd;',
+    'void main(){',
+    '  vec2 clip = vec2(position.x / uAspect * 2.0 - 1.0, 1.0 - position.y * 2.0);',
+    '  gl_Position = vec4(clip, 0.0, 1.0);',
+    '  gl_PointSize = uPx;',
+    '  vSpd = aSpd;',
+    '}'
+  ].join('\n');
+
+  var PTS_FS = [
+    'precision highp float;',
+    'varying float vSpd;',
+    'void main(){',
+    '  vec2 uv = gl_PointCoord - 0.5;',
+    '  float r2 = dot(uv, uv) * 4.0;',
+    '  if (r2 > 1.0) discard;',
+    '  float g = exp(-r2 * 3.1) * 0.34;',
+    '  gl_FragColor = vec4(min(vSpd * 0.5, 1.0) * g, 0.0, 0.0, g);',
+    '}'
+  ].join('\n');
+
+  var COMP_FS = [
+    'precision highp float;',
+    'varying vec2 vUv;',
+    'uniform sampler2D uField;',
+    'uniform vec2 uTexel;',
+    'uniform float uAspect, uTime, uTilt;',
+    'uniform vec3 uFieldC, uFieldHi, uMilk, uDeep, uHot;',
+    'float fieldAt(vec2 uv){ return texture2D(uField, uv).a; }',
+    'vec3 graph(vec2 p){',
+    '  vec2 g = p * vec2(uAspect, 1.0) * 14.0;',
+    '  vec2 f = abs(fract(g) - 0.5);',
+    '  float line = smoothstep(0.47, 0.5, max(f.x, f.y));',
+    '  vec2 f5 = abs(fract(g / 5.0) - 0.5);',
+    '  float maj = smoothstep(0.465, 0.5, max(f5.x, f5.y));',
+    '  vec3 c = uFieldC;',
+    '  c = mix(c, uFieldHi, line * 0.35 + maj * 0.5);',
+    '  return c;',
+    '}',
+    'void main(){',
+    '  float t  = fieldAt(vUv);',
+    '  float sp = texture2D(uField, vUv).r;',
+    '  float tx = fieldAt(vUv + vec2(uTexel.x, 0.0)) - fieldAt(vUv - vec2(uTexel.x, 0.0));',
+    '  float ty = fieldAt(vUv + vec2(0.0, uTexel.y)) - fieldAt(vUv - vec2(0.0, uTexel.y));',
+    '  vec2 grad = vec2(tx, ty);',
+    '  float edge = smoothstep(0.30, 0.42, t);',
+    '  vec2 refr = grad * (0.12 + 0.10 * edge);',
+    '  vec3 bg = graph(vUv + refr * edge);',
+    '  float body = smoothstep(0.42, 0.95, t);',
+    '  float speedN = clamp(sp / max(t, 0.001) * 1.4, 0.0, 1.0);',
+    '  vec3 fluid = mix(uMilk, uDeep, body * 0.55);',
+    '  fluid = mix(fluid, uHot, speedN * 0.65);',
+    '  float rim = smoothstep(0.30, 0.40, t) * (1.0 - smoothstep(0.40, 0.55, t));',
+    '  vec2 ldir = normalize(vec2(sin(uTilt) * 0.4 - 0.5, -0.85));',
+    '  float spec = clamp(dot(normalize(grad + vec2(1e-5)), ldir), 0.0, 1.0);',
+    '  fluid += rim * (0.20 + spec * 0.55);',
+    '  vec3 col = mix(bg, fluid, edge);',
+    '  col = mix(col, uFieldHi, rim * 0.12);',
+    '  gl_FragColor = vec4(col, 1.0);',
+    '}'
+  ].join('\n');
+
+  var QUAD_VS = [
+    'varying vec2 vUv;',
+    'void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }'
+  ].join('\n');
+
+  function css(name){
+    return new THREE.Color(getComputedStyle(docEl).getPropertyValue(name).trim());
+  }
+
+  function init(){
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias:false, alpha:false, powerPreference:'high-performance' });
+    } catch(e){ return false; }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 1.75));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.autoClear = false;
+    document.getElementById('gl').appendChild(renderer.domElement);
+
+    rtCam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+
+    ptsGeom = new THREE.BufferGeometry();
+    var pos = new Float32Array(SPH.NMAX*3);
+    var spd = new Float32Array(SPH.NMAX);
+    posAttr = new THREE.BufferAttribute(pos,3).setUsage(THREE.DynamicDrawUsage);
+    spdAttr = new THREE.BufferAttribute(spd,1).setUsage(THREE.DynamicDrawUsage);
+    ptsGeom.setAttribute('position', posAttr);
+    ptsGeom.setAttribute('aSpd', spdAttr);
+    ptsGeom.setDrawRange(0,0);
+
+    ptsMat = new THREE.ShaderMaterial({
+      vertexShader:PTS_VS, fragmentShader:PTS_FS,
+      transparent:true, depthWrite:false, depthTest:false,
+      blending:THREE.CustomBlending,
+      blendSrc:THREE.OneFactor, blendDst:THREE.OneFactor,
+      uniforms:{ uPx:{value:24}, uAspect:{value:SIM.A} }
+    });
+    rtScene = new THREE.Scene();
+    var ptsObj = new THREE.Points(ptsGeom, ptsMat);
+    ptsObj.frustumCulled = false;
+    rtScene.add(ptsObj);
+
+    compMat = new THREE.ShaderMaterial({
+      vertexShader:QUAD_VS, fragmentShader:COMP_FS,
+      depthWrite:false, depthTest:false,
+      uniforms:{
+        uField:{value:null}, uTexel:{value:new THREE.Vector2(0,0)},
+        uAspect:{value:SIM.A}, uTime:{value:0}, uTilt:{value:0},
+        uFieldC:{value:css('--field')}, uFieldHi:{value:css('--field-hi')},
+        uMilk:{value:css('--milk')}, uDeep:{value:new THREE.Color('#e8c290')},
+        uHot:{value:new THREE.Color('#ff9e64')}
+      }
+    });
+    compScene = new THREE.Scene();
+    compScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2), compMat));
+
+    makeRT();
+    return true;
+  }
+
+  function makeRT(){
+    if (rt) rt.dispose();
+    var w = Math.max(2, Math.floor(window.innerWidth*RTSCALE));
+    var h = Math.max(2, Math.floor(window.innerHeight*RTSCALE));
+    rt = new THREE.WebGLRenderTarget(w,h,{
+      minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter,
+      format:THREE.RGBAFormat, depthBuffer:false, stencilBuffer:false
+    });
+    compMat.uniforms.uField.value = rt.texture;
+    compMat.uniforms.uTexel.value.set(1.5/w, 1.5/h);
+    ptsMat.uniforms.uPx.value = SPH.H * window.innerHeight * RTSCALE * 2.4;
+  }
+
+  function frame(t){
+    var N=SPH.N, pa=posAttr.array, sa=spdAttr.array;
+    for (var i=0;i<N;i++){
+      pa[i*3]=SPH.px[i]; pa[i*3+1]=SPH.py[i]; pa[i*3+2]=0;
+      sa[i]=SPH.spd[i];
+    }
+    posAttr.needsUpdate=true; spdAttr.needsUpdate=true;
+    ptsGeom.setDrawRange(0,N);
+    ptsMat.uniforms.uAspect.value=SIM.A;
+    compMat.uniforms.uAspect.value=SIM.A;
+    compMat.uniforms.uTime.value=t;
+    compMat.uniforms.uTilt.value=SPH.tilt.v;
+
+    renderer.setRenderTarget(rt);
+    renderer.setClearColor(0x000000, 0);
+    renderer.clear(true,false,false);
+    renderer.render(rtScene, rtCam);
+    renderer.setRenderTarget(null);
+    renderer.render(compScene, rtCam);
+  }
+
+  function resize(){
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    makeRT();
+  }
+  return { init:init, frame:frame, resize:resize };
+})();
+
+/* ==================================================================
+   OVERLAY — 2-D layer: vessel wall stroke, spout, floats, paddle
+   ================================================================== */
+var OVERLAY = (function () {
+  var cv = document.getElementById('overlay'), ctx = null, DPR = 1;
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio||1, 2);
+    cv.width = window.innerWidth*DPR; cv.height = window.innerHeight*DPR;
+    cv.style.width = window.innerWidth+'px'; cv.style.height = window.innerHeight+'px';
+    ctx = cv.getContext('2d');
+  }
+  resize();
+
+  function draw(t){
+    var S = window.innerHeight*DPR;
+    var W = cv.width, Hh = cv.height;
+    ctx.clearRect(0,0,W,Hh);
+    var w = VESSELS.wall, n=w.length/2;
+
+    /* vessel wall — twin stroke: bone hairline + faint offset ghost */
+    ctx.lineJoin='round';
+    ctx.beginPath();
+    for (var i=0;i<n;i++){
+      var x=w[i*2]*S, y=w[i*2+1]*S;
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle='rgba(233,236,248,0.85)';
+    ctx.lineWidth=1.6*DPR;
+    ctx.stroke();
+    ctx.strokeStyle='rgba(233,236,248,0.16)';
+    ctx.lineWidth=7*DPR;
+    ctx.stroke();
+
+    /* spout while pouring */
+    if (SPH.emitter.on){
+      var sx=SIM.A/2*S, sy=-0.06*S;
+      ctx.strokeStyle='rgba(242,234,217,0.9)';
+      ctx.lineWidth=2.2*DPR;
+      ctx.beginPath(); ctx.moveTo(sx-9*DPR, 0); ctx.lineTo(sx-9*DPR, 12*DPR);
+      ctx.moveTo(sx+9*DPR, 0); ctx.lineTo(sx+9*DPR, 12*DPR); ctx.stroke();
+    }
+
+    /* floats: cream discs, tick mark shows rotation */
+    if (FLOATS){
+      var L=FLOATS.list;
+      for (var f=0; f<L.length; f++){
+        var b=L[f].b, r=L[f].r*S;
+        var x2=b.position.x/window.innerHeight*S, y2=b.position.y/window.innerHeight*S;
+        ctx.save();
+        ctx.translate(x2,y2); ctx.rotate(b.angle);
+        ctx.fillStyle='#f2ead9';
+        ctx.beginPath(); ctx.arc(0,0,r,0,TAU); ctx.fill();
+        ctx.strokeStyle='rgba(27,42,166,0.55)';
+        ctx.lineWidth=1.4*DPR;
+        ctx.beginPath(); ctx.arc(0,0,r*0.62,0,TAU); ctx.stroke();
+        ctx.strokeStyle='#ff6a3d';
+        ctx.lineWidth=2*DPR;
+        ctx.beginPath(); ctx.moveTo(0,-r*0.62); ctx.lineTo(0,-r); ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+  return { draw:draw, resize:resize };
+})();
+
+/* ==================================================================
+   UI — statechart, deck, dial, cursor, input, boot, master loop
+   ================================================================== */
+var stTag  = document.getElementById('st-tag');
+var stName = document.getElementById('st-name');
+var stNote = document.getElementById('st-note');
+var tN   = document.getElementById('t-n');
+var tSim = document.getElementById('t-sim');
+var tFps = document.getElementById('t-fps');
+
+function splitChars(el, text){
+  el.textContent='';
+  var frag=document.createDocumentFragment();
+  for (var i=0;i<text.length;i++){
+    var s=document.createElement('span');
+    s.className='ch';
+    s.textContent = text[i]===' ' ? '\u00A0' : text[i];
+    frag.appendChild(s);
+  }
+  el.appendChild(frag);
+}
+var nameAnim=null;
+function setName(txt){
+  if (!HAS_ANIME || RM){ stName.textContent=txt; return; }
+  if (nameAnim) nameAnim.pause();
+  var chs=stName.querySelectorAll('.ch');
+  nameAnim=anime.timeline({ easing:'easeOutExpo' });
+  if (chs.length){
+    nameAnim.add({ targets:chs, translateY:[0,-9], opacity:[1,0], duration:150, delay:anime.stagger(9) });
+  }
+  nameAnim.add({ duration:1, complete:function(){ splitChars(stName, txt); } });
+  nameAnim.add({ targets:{t:0}, t:1, duration:1, complete:function(){
+    anime({ targets:stName.querySelectorAll('.ch'), translateY:[10,0], opacity:[0,1],
+            duration:420, delay:anime.stagger(13), easing:'easeOutExpo' });
+  }});
+}
+
+/* ---------- statechart ---------- */
+var machine = createMachine({
+  initial:'boot',
+  states:{
+    boot:{ on:{ DONE:'bench' } },
+    bench:{
+      entry:function(){
+        document.getElementById('boot').style.display='none';
+        document.body.classList.remove('pre');
+        if (HAS_ANIME && !RM){
+          anime({ targets:'[data-ui]', translateY:[10,0], opacity:[0,1],
+                  duration:680, delay:anime.stagger(60,{start:60}), easing:'easeOutCubic' });
+          gsap.to('#hint',{ autoAlpha:0, delay:8, duration:1 });
+        } else {
+          document.querySelectorAll('[data-ui]').forEach(function(el){ el.style.opacity=1; });
+        }
+      }
+    }
+  }
+});
+
+/* ---------- matter presets ---------- */
+var segBtns = { water:document.getElementById('m-water'),
+                syrup:document.getElementById('m-syrup'),
+                gel:  document.getElementById('m-gel') };
+function choosePreset(name){
+  var q = SPH.setPreset(name, false);
+  if (!q) return;
+  Object.keys(segBtns).forEach(function(k){ segBtns[k].classList.toggle('on', k===name); });
+  stTag.textContent = q.tag;
+  stNote.textContent = q.note;
+  setName(name.toUpperCase());
+}
+segBtns.water.addEventListener('click', function(){ choosePreset('water'); });
+segBtns.syrup.addEventListener('click', function(){ choosePreset('syrup'); });
+segBtns.gel.addEventListener('click', function(){ choosePreset('gel'); });
+
+/* ---------- vessel cycle + glyph morph ---------- */
+var GLYPHS = [
+  [3,2, 3,12, 5,14, 11,14, 13,12, 13,2],                       // basin
+  [6,2, 6,6, 3,12, 4,14, 12,14, 13,12, 10,6, 10,2],            // flask
+  [3,2, 3,10, 5,13, 7,12, 7,2, 9,2, 9,12, 11,13, 13,10, 13,2], // u-tube
+  [2,2, 2,7, 5,13, 11,13, 14,7, 14,2]                          // bowl
+];
+var glyphM = 40, glyphCur = MORPH.resample(new Float32Array(GLYPHS[0]), glyphM);
+var vGlyph = document.getElementById('v-glyph');
+vGlyph.setAttribute('d', MORPH.toPath(glyphCur,1,1));
+var vIdx = 0, glyphT = { t:0 };
+document.getElementById('k-vessel').addEventListener('click', function(){
+  var info = VESSELS.next();
+  vIdx = (vIdx+1)%GLYPHS.length;
+  var from = glyphCur.slice(), to = MORPH.resample(new Float32Array(GLYPHS[vIdx]), glyphM);
+  gsap.killTweensOf(glyphT); glyphT.t=0;
+  gsap.to(glyphT,{ t:1, duration:RM?0:0.8, ease:'elastic.out(1,0.5)', onUpdate:function(){
+    MORPH.mix(from,to,clamp(glyphT.t,0,1),glyphCur);
+    vGlyph.setAttribute('d', MORPH.toPath(glyphCur,1,1));
+  }});
+  stNote.textContent = 'vessel · ' + info.name + ' — ' + info.note;
+  gsap.fromTo('#gl',{ y:-5 },{ y:0, duration:0.6, ease:'elastic.out(1.3,0.35)' });
+  gsap.fromTo('#overlay',{ y:-5 },{ y:0, duration:0.6, ease:'elastic.out(1.3,0.35)' });
+});
+
+/* ---------- pour / float / slosh / reset ---------- */
+var kPour = document.getElementById('k-pour');
+function setPour(on){
+  SPH.emitter.on = on;
+  kPour.classList.toggle('pouring', on);
+  kPour.setAttribute('aria-pressed', String(on));
+}
+kPour.addEventListener('pointerdown', function(e){ e.stopPropagation(); setPour(true); });
+window.addEventListener('pointerup', function(){ if (SPH.emitter.on && machine.state==='bench') setPour(false); });
+kPour.addEventListener('click', function(e){ e.preventDefault(); });
+
+document.getElementById('k-float').addEventListener('click', function(){
+  if (FLOATS) FLOATS.add();
+  if (HAS_ANIME) anime({ targets:'#k-float', scale:[0.9,1], duration:400, easing:'spring(1,90,12,0)' });
+});
+document.getElementById('k-slosh').addEventListener('click', function(){ slosh(); });
+document.getElementById('k-reset').addEventListener('click', function(){
+  SPH.seed(Math.floor(SPH.NMAX*0.62), true);
+  if (FLOATS) FLOATS.clear();
+  gsap.fromTo(['#gl','#overlay'],{ scale:0.985 },{ scale:1, duration:0.7, ease:'elastic.out(1.1,0.4)' });
+});
+function slosh(){
+  var x = pad.on ? pad.x : SIM.A/2;
+  var y = pad.on ? pad.y : 0.6;
+  SPH.burst(x, y, 7.5);
+  gsap.fromTo(['#gl','#overlay'],{ x:0 },{ x:rand(-6,6), duration:0.07, yoyo:true, repeat:3,
+    ease:'sine.inOut', onComplete:function(){ gsap.set(['#gl','#overlay'],{x:0}); } });
+}
+
+/* ---------- tilt: drag + lenis-style wheel smoothing ---------- */
+var tiltTarget = 0;
+var MAXTILT = Math.PI/3;
+window.addEventListener('wheel', function(e){
+  if (machine.state!=='bench') return;
+  e.preventDefault();
+  tiltTarget = clamp(tiltTarget + e.deltaY*0.0011, -MAXTILT, MAXTILT);
+}, { passive:false });
+
+/* ---------- pointer: paddle, tilt drag, hold-grab ---------- */
+var pad = SPH.pad;
+var ptr = { down:false, mode:'idle', sx:0, sy:0, lx:0, ly:0, t0:0, startTilt:0 };
+function toSim(e){ return { x: e.clientX/window.innerHeight, y: e.clientY/window.innerHeight }; }
+
+window.addEventListener('pointermove', function(e){
+  var s = toSim(e);
+  var dt = 1/60;
+  pad.vx = lerp(pad.vx, (s.x-pad.x)/dt, 0.35);
+  pad.vy = lerp(pad.vy, (s.y-pad.y)/dt, 0.35);
+  var vl = Math.hypot(pad.vx,pad.vy);
+  if (vl>6){ pad.vx*=6/vl; pad.vy*=6/vl; }
+  pad.x=s.x; pad.y=s.y; pad.on=true;
+  cal.x=e.clientX; cal.y=e.clientY;
+  if (ptr.down){
+    var dx=e.clientX-ptr.sx, dy=e.clientY-ptr.sy;
+    if (ptr.mode==='pending' && Math.hypot(dx,dy)>9){
+      ptr.mode='tilt';
+      gsap.killTweensOf(pad);
+      pad.grab=0;
+    }
+    if (ptr.mode==='tilt'){
+      tiltTarget = clamp(ptr.startTilt + dx*0.0035, -MAXTILT, MAXTILT);
+    }
+  }
+});
+window.addEventListener('pointerdown', function(e){
+  if (e.target.closest('.key') || e.target.closest('.seg') || e.target.closest('header')) return;
+  if (machine.state!=='bench') return;
+  var s=toSim(e);
+  pad.x=s.x; pad.y=s.y; pad.on=true;
+  ptr.down=true; ptr.mode='pending';
+  ptr.sx=e.clientX; ptr.sy=e.clientY; ptr.startTilt=tiltTarget; ptr.t0=performance.now();
+  gsap.killTweensOf(pad);
+  gsap.to(pad,{ grab:1, duration:0.8, ease:'power2.in', delay:0.20,
+    onStart:function(){ if (ptr.mode==='pending'){ ptr.mode='grab'; calEl.classList.add('grab'); } } });
+});
+window.addEventListener('pointerup', function(){
+  ptr.down=false; ptr.mode='idle';
+  calEl.classList.remove('grab');
+  gsap.killTweensOf(pad);
+  gsap.to(pad,{ grab:0, duration:0.35, ease:'power2.out' });
+});
+window.addEventListener('blur', function(){ ptr.down=false; pad.grab=0; });
+
+/* ---------- keyboard ---------- */
+window.addEventListener('keydown', function(e){
+  var tag=(e.target&&e.target.tagName)||'';
+  if (tag==='INPUT'||tag==='BUTTON'||tag==='A') return;
+  if (machine.state!=='bench') return;
+  if (e.key==='1') choosePreset('water');
+  else if (e.key==='2') choosePreset('syrup');
+  else if (e.key==='3') choosePreset('gel');
+  else if (e.key==='v'||e.key==='V') document.getElementById('k-vessel').click();
+  else if (e.key==='f'||e.key==='F') document.getElementById('k-float').click();
+  else if (e.key==='r'||e.key==='R') document.getElementById('k-reset').click();
+  else if (e.key==='p'||e.key==='P'){ setPour(!SPH.emitter.on); }
+  else if (e.key===' '){ e.preventDefault(); slosh(); }
+  else if (e.key==='ArrowLeft'){ tiltTarget=clamp(tiltTarget-0.09,-MAXTILT,MAXTILT); }
+  else if (e.key==='ArrowRight'){ tiltTarget=clamp(tiltTarget+0.09,-MAXTILT,MAXTILT); }
+  else if (e.key==='0'){ tiltTarget=0; }
+});
+
+/* ---------- tilt dial ---------- */
+var needle = document.getElementById('needle');
+var dDeg = document.getElementById('d-deg');
+(function buildDial(){
+  var g = document.getElementById('d-ticks');
+  var cx=64, cy=95, ns='http://www.w3.org/2000/svg';
+  for (var a=-60;a<=60;a+=10){
+    var rad = Math.PI + a*Math.PI/180;
+    var r0 = (a%30===0)?40:45, r1=50;
+    var ln = document.createElementNS(ns,'line');
+    ln.setAttribute('x1', cx+Math.cos(rad)*r0); ln.setAttribute('y1', cy+Math.sin(rad)*r0);
+    ln.setAttribute('x2', cx+Math.cos(rad)*r1); ln.setAttribute('y2', cy+Math.sin(rad)*r1);
+    ln.setAttribute('class', 'tick'+(a%30===0?' maj':''));
+    g.appendChild(ln);
+  }
+  var arc=document.querySelector('#dial .arc');
+  var a0=Math.PI-Math.PI/3, a1=Math.PI+Math.PI/3, R=50;
+  arc.setAttribute('d','M '+(cx+Math.cos(a0)*R)+' '+(cy+Math.sin(a0)*R)+
+    ' A '+R+' '+R+' 0 0 0 '+(cx+Math.cos(a1)*R)+' '+(cy+Math.sin(a1)*R));
+})();
+function drawDial(){
+  var v=SPH.tilt.v, cx=64, cy=95;
+  var rad=Math.PI+v;
+  needle.setAttribute('x2', cx+Math.cos(rad)*36);
+  needle.setAttribute('y2', cy+Math.sin(rad)*36);
+  needle.setAttribute('x1', cx+Math.cos(rad)*8);
+  needle.setAttribute('y1', cy+Math.sin(rad)*8);
+  dDeg.textContent=(v*180/Math.PI).toFixed(1)+'°';
+}
+
+/* ---------- caliper cursor ---------- */
+var calEl=document.getElementById('cal');
+var cal={ x:innerWidth/2, y:innerHeight/2, sx:innerWidth/2, sy:innerHeight/2 };
+var calRing=document.getElementById('cal-ring');
+function cursorFrame(dt){
+  if (!FINE) return;
+  cal.sx=lerp(cal.sx,cal.x,1-Math.pow(0.0002,dt));
+  cal.sy=lerp(cal.sy,cal.y,1-Math.pow(0.0002,dt));
+  calEl.style.transform='translate('+cal.sx+'px,'+cal.sy+'px)';
+  var r=pad.r*(1+pad.grab*0.9)*window.innerHeight;
+  calRing.setAttribute('r', r);
+}
+
+/* ---------- boot: the tank literally fills ---------- */
+var fillN=document.getElementById('fill-n');
+document.getElementById('fill-max').textContent=Math.floor(SPH.NMAX*0.62);
+splitChars(document.getElementById('boot-word'),'BASIN');
+(function(){
+  var chs=document.querySelectorAll('#boot-word .ch');
+  if (chs[3]) chs[3].classList.add('sig');
+  if (HAS_ANIME && !RM){
+    anime({ targets:chs, opacity:[0,1], translateY:[40,0], rotate:['6deg','0deg'],
+            duration:850, delay:anime.stagger(65,{start:250}), easing:'easeOutExpo' });
+  } else { chs.forEach(function(c){ c.style.opacity=1; }); }
+})();
+var FILL_TARGET=Math.floor(SPH.NMAX*0.62);
+function bootTick(){
+  if (machine.state!=='boot') return;
+  fillN.textContent=SPH.N;
+  if (SPH.N>=FILL_TARGET){
+    setPour(false);
+    gsap.delayedCall(0.55, function(){
+      if (HAS_ANIME && !RM){
+        anime({ targets:'#boot .word .ch', opacity:[1,0], translateY:[0,-30],
+                duration:520, delay:anime.stagger(28), easing:'easeInExpo' });
+        gsap.to('#fill-read',{ autoAlpha:0, duration:0.4 });
+        gsap.delayedCall(0.7, function(){ machine.send('DONE'); });
+      } else machine.send('DONE');
+    });
+  }
+}
+
+/* ---------- master loop ---------- */
+var lastT=performance.now(), simMs=0, fpsEma=60, lastTele=0, running=true;
+function loop(now){
+  requestAnimationFrame(loop);
+  if (!running) { lastT=now; return; }
+  var dt=clamp((now-lastT)/1000, 0.001, 0.05);
+  lastT=now; var t=now/1000;
+
+  /* lenis-style tilt smoothing */
+  SPH.tilt.v += (tiltTarget - SPH.tilt.v)*(1-Math.pow(0.004,dt));
+
+  var s0=performance.now();
+  SPH.step(dt);
+  simMs=lerp(simMs, performance.now()-s0, 0.1);
+
+  if (FLOATS) FLOATS.step(dt);
+  RENDER.frame(t);
+  OVERLAY.draw(t);
+  drawDial();
+  cursorFrame(dt);
+
+  if (machine.state==='boot') bootTick();
+
+  fpsEma=lerp(fpsEma, 1/Math.max(dt,0.0001), 0.06);
+  if (now-lastTele>480){
+    lastTele=now;
+    tN.textContent=SPH.N;
+    tSim.textContent=simMs.toFixed(1);
+    tFps.textContent=Math.round(fpsEma);
+  }
+}
+
+/* ---------- resize ---------- */
+function onResize(){
+  SIM.A = window.innerWidth/window.innerHeight;
+  VESSELS.regen();
+  SPH.gridAlloc();
+  RENDER.resize();
+  OVERLAY.resize();
+}
+window.addEventListener('resize', onResize);
+document.addEventListener('visibilitychange', function(){
+  running = !document.hidden; lastT=performance.now();
+});
+
+/* ---------- go ---------- */
+SIM.A = window.innerWidth/window.innerHeight;
+VESSELS.init();
+if (!RENDER.init()){
+  document.getElementById('nogl').style.display='flex';
+  document.body.classList.remove('pre');
+} else {
+  if (RM){
+    SPH.seed(FILL_TARGET, true);
+    machine.send('DONE');
+  } else {
+    SPH.seed(0, true);
+    setPour(true);
+  }
+  requestAnimationFrame(loop);
+}
+
+})();
+</script>
+</body>
+</html>
