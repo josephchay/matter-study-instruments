@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>TIDE · self-gravitating study</title>
+<!--
+   TIDE — self-gravitating study · experiment 07
+   22,000-body gravitational N-body: Barnes-Hut quadtree forces,
+   symplectic leapfrog (KDK) integration, live energy & angular-
+   momentum telemetry. Studies: Kepler-shear disc, tidal collision,
+   trojan libration with Newton-solved Lagrange points.
+   three.js r128 · gsap · anime.js · Tone.js from cdnjs.
+   Flubber morphs / statechart / lenis smoothing / framer springs are
+   faithful inline implementations. matter.js sat this one out —
+   Newton needed no middleman.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --night0:#0a1120; --night1:#0e1930; --night2:#122340;
+  --plate:#f0e6cf; --plate-dim:#b7ad95;
+  --gold:#c9a24d; --gold-dim:#8a6f36; --gold-hair:rgba(201,162,77,.32);
+}
+*{ margin:0; padding:0; box-sizing:border-box; }
+html,body{ height:100%; overflow:hidden; }
+body{
+  background:radial-gradient(120% 90% at 50% 8%, var(--night2) 0%, var(--night1) 42%, var(--night0) 100%);
+  color:var(--plate);
+  font-family:'Spline Sans Mono',ui-monospace,monospace;
+  font-size:11px; letter-spacing:.02em;
+  -webkit-user-select:none; user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:none;
+}
+#stage{ position:fixed; inset:0; }
+#gl{ position:absolute; inset:0; }
+#gl canvas{ display:block; width:100%; height:100%; }
+#overlay{ position:absolute; inset:0; pointer-events:none; }
+
+.rail{ position:fixed; left:0; right:0; display:flex; align-items:center;
+  padding:16px 20px; gap:14px; z-index:30; pointer-events:none; }
+.rail>*{ pointer-events:auto; }
+#rail-top{ top:0; justify-content:space-between; align-items:flex-start; }
+#rail-bot{ bottom:0; justify-content:space-between; align-items:flex-end; }
+.brand h1{
+  font-family:'Fraunces',serif; font-weight:700; font-size:34px;
+  line-height:.9; letter-spacing:.10em; color:var(--plate);
+}
+.brand h1 .g{ color:var(--gold); }
+.brand .sub{ display:block; margin-top:5px; font-size:9px; letter-spacing:.22em;
+  text-transform:uppercase; color:var(--plate-dim); }
+.tele{ text-align:right; font-size:9px; line-height:1.8; color:var(--plate-dim);
+  letter-spacing:.08em; text-transform:uppercase; }
+.tele b{ color:var(--plate); font-weight:500; }
+.tele .g{ color:var(--gold); }
+
+.deck{ display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; }
+button{
+  font-family:'Spline Sans Mono',monospace; font-size:9px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--plate);
+  background:rgba(10,17,32,.55);
+  border:1px solid var(--gold-hair); border-radius:2px;
+  padding:9px 13px; cursor:pointer; position:relative;
+  backdrop-filter:blur(3px);
+}
+button .key{ opacity:.4; margin-left:6px; }
+button.on{ background:var(--gold); color:#141322; border-color:var(--gold); }
+button.on .key{ opacity:.55; }
+.seg{ display:flex; }
+.seg button{ border-radius:0; }
+.seg button:first-child{ border-radius:2px 0 0 2px; }
+.seg button:last-child{ border-radius:0 2px 2px 0; }
+.seg button+button{ border-left:none; }
+.chip{ display:flex; align-items:center; gap:8px; }
+.chip svg{ width:15px; height:15px; }
+.chip svg path{ fill:none; stroke:currentColor; stroke-width:1.5;
+  stroke-linecap:round; stroke-linejoin:round; }
+
+#lever{
+  position:fixed; right:20px; top:50%; transform:translateY(-50%);
+  width:42px; height:min(280px,40vh); z-index:30;
+  background:rgba(10,17,32,.55); border:1px solid var(--gold-hair); border-radius:3px;
+  cursor:ns-resize; touch-action:none; backdrop-filter:blur(3px);
+}
+#lever .track{ position:absolute; left:50%; top:14px; bottom:14px; width:1px;
+  transform:translateX(-50%); background:var(--gold-hair); }
+#lever .grip{
+  position:absolute; left:5px; right:5px; height:18px; top:55%;
+  background:var(--night1); border:1px solid var(--gold); border-radius:2px;
+}
+#lever .grip::after{ content:''; position:absolute; left:7px; right:7px; top:50%;
+  height:1px; background:var(--gold); }
+#lever .lab{ position:absolute; left:50%; bottom:-16px; transform:translateX(-50%);
+  font-size:8px; letter-spacing:.18em; color:var(--plate-dim); white-space:nowrap; }
+#lever .val{ position:absolute; left:50%; top:-18px; transform:translateX(-50%);
+  font-size:9px; color:var(--gold); }
+
+#hint{ position:fixed; left:50%; bottom:66px; transform:translateX(-50%);
+  font-size:9px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--plate-dim); z-index:25; text-align:center; line-height:2;
+  opacity:0; pointer-events:none; }
+
+#veil{ position:fixed; inset:0; z-index:60;
+  background:radial-gradient(120% 90% at 50% 8%, var(--night2), var(--night0) 80%);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:20px; }
+#veil .word{ display:flex; gap:4px; }
+#veil .word span{
+  font-family:'Fraunces',serif; font-weight:700;
+  font-size:clamp(70px,15vw,130px); line-height:.9; letter-spacing:.06em;
+  color:var(--plate); display:inline-block; opacity:0;
+}
+#veil .word span.g{ color:var(--gold); }
+#veil .knit{ font-size:9px; letter-spacing:.24em; text-transform:uppercase;
+  color:var(--plate-dim); }
+#veil.done{ pointer-events:none; }
+
+#nogl{ position:fixed; inset:0; z-index:70; display:none;
+  align-items:center; justify-content:center; text-align:center;
+  background:var(--night0); color:var(--plate); padding:30px; line-height:1.9; }
+
+#cur{ position:fixed; width:11px; height:11px; margin:-5.5px 0 0 -5.5px;
+  border:1px solid var(--gold); border-radius:50%;
+  z-index:50; pointer-events:none; display:none; }
+body.fine #cur{ display:block; }
+body.fine, body.fine button, body.fine #lever{ cursor:none; }
+@media (max-width:760px){
+  .brand h1{ font-size:26px; }
+  .tele{ display:none; }
+  #lever{ right:12px; width:36px; }
+}
+</style>
+</head>
+<body class="pre">
+<div id="stage">
+  <div id="gl"></div>
+  <canvas id="overlay"></canvas>
+</div>
+
+<div id="rail-top" class="rail">
+  <div class="brand">
+    <h1>TI<span class="g">D</span>E</h1>
+    <span class="sub">self-gravitating study · exp.07</span>
+  </div>
+  <div class="tele" id="tele">
+    bodies <b id="t-n">—</b> · tree <b id="t-tree">—</b><br>
+    <span class="g">ΔE <b id="t-e">0.00%</b></span> · ΔL <b id="t-l">0.00%</b> · <b id="t-fps">60</b> fps
+  </div>
+</div>
+
+<div id="rail-bot" class="rail">
+  <div class="deck">
+    <div class="seg" id="modes">
+      <button id="m-disc" class="on">disc<span class="key">1</span></button>
+      <button id="m-collide">collide<span class="key">2</span></button>
+      <button id="m-trojan">trojan<span class="key">3</span></button>
+    </div>
+    <button id="k-galaxy" class="chip"><svg viewBox="0 0 16 16"><path id="chip-path" d="M8 2 A6 6 0 1 1 7.9 2 Z"/></svg>galaxy<span class="key">G</span></button>
+    <button id="k-trails" class="on">trails<span class="key">T</span></button>
+  </div>
+  <div class="deck">
+    <button id="k-sound">tone<span class="key">S</span></button>
+    <button id="k-reset">reset<span class="key">R</span></button>
+  </div>
+</div>
+
+<div id="lever">
+  <div class="track"></div>
+  <div class="grip" id="grip"></div>
+  <div class="val" id="lever-val">1.0×</div>
+  <div class="lab">TIME WARP</div>
+</div>
+
+<div id="hint">drag — sling a galaxy · hold — finger of mass · tap — star cluster · wheel — warp</div>
+
+<div id="veil">
+  <div class="word" id="word">
+    <span>T</span><span>I</span><span class="g">D</span><span>E</span>
+  </div>
+  <div class="knit" id="knit">seeding bodies —</div>
+</div>
+<div id="nogl">TIDE needs WebGL.<br>This browser or GPU declined — try a desktop browser.</div>
+<div id="cur"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+<script>
+/* ==================================================================
+   TIDE — core script
+   ================================================================== */
+(function () {
+'use strict';
+
+var docEl = document.documentElement;
+if (!window.THREE || !window.gsap) {
+  document.getElementById('nogl').style.display = 'flex';
+  return;
+}
+var HAS_ANIME = !!window.anime;
+var HAS_TONE  = !!window.Tone;
+var RM   = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var FINE = window.matchMedia('(pointer: fine)').matches;
+if (FINE) document.body.classList.add('fine');
+
+var TAU = Math.PI*2;
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+function lerp(a,b,t){ return a+(b-a)*t; }
+function rand(a,b){ return a+Math.random()*(b-a); }
+
+/* ==================================================================
+   MACHINE — pocket statechart
+   ================================================================== */
+function createMachine(cfg){
+  var m = {
+    state: cfg.initial,
+    send: function (evt) {
+      var node = cfg.states[m.state];
+      var target = node.on && node.on[evt];
+      if (!target) return;
+      if (node.exit) node.exit();
+      m.state = target;
+      var next = cfg.states[target];
+      if (next.entry) next.entry();
+    }
+  };
+  var first = cfg.states[cfg.initial];
+  if (first.entry) first.entry();
+  return m;
+}
+
+/* ==================================================================
+   MORPH — flubber-style resample / mix (preset chip glyphs)
+   ================================================================== */
+var MORPH = (function () {
+  function resample(pts, M) {
+    var n = pts.length/2, lens=[0], total=0, i;
+    for (i=0;i<n;i++){
+      var x0=pts[i*2], y0=pts[i*2+1];
+      var x1=pts[((i+1)%n)*2], y1=pts[((i+1)%n)*2+1];
+      total += Math.hypot(x1-x0,y1-y0); lens.push(total);
+    }
+    var out=new Float32Array(M*2), seg=0;
+    for (i=0;i<M;i++){
+      var d=(i/M)*total;
+      while (seg<n-1 && lens[seg+1]<d) seg++;
+      var l0=lens[seg], l1=lens[seg+1];
+      var f=l1>l0 ? (d-l0)/(l1-l0) : 0;
+      var a=seg%n, b=(seg+1)%n;
+      out[i*2]  =lerp(pts[a*2],  pts[b*2],  f);
+      out[i*2+1]=lerp(pts[a*2+1],pts[b*2+1],f);
+    }
+    return out;
+  }
+  function mix(a,b,t,out){ for (var i=0;i<a.length;i++) out[i]=a[i]+(b[i]-a[i])*t; return out; }
+  function toPath(pts,sx,sy){
+    var d='', M=pts.length/2;
+    for (var i=0;i<M;i++) d+=(i===0?'M':'L')+(pts[i*2]*sx).toFixed(2)+' '+(pts[i*2+1]*sy).toFixed(2);
+    return d+'Z';
+  }
+  return { resample:resample, mix:mix, toPath:toPath };
+})();
+
+/* ==================================================================
+   TREE — Barnes-Hut quadtree on flat typed arrays.
+   Node fields (index i):
+     kid[i*4..+3]  child node indices (-1 none)
+     body[i]       leaf body index (-1 internal / empty)
+     mass[i], comx[i], comy[i]  aggregated mass + center of mass
+     cx[i], cy[i], half[i]      cell geometry
+   ================================================================== */
+var TREE = (function(){
+  var B = 8;                       /* leaf bucket capacity */
+  var CAP = 0;
+  var kid, bcount, bodyIdx, mass, comx, comy, cx, cy, half;
+  var used = 0;
+  var stack = new Int32Array(4096);
+  var pend  = new Int32Array(256); /* (body,node) pairs for re-insertion */
+
+  function ensure(n){
+    var need = Math.ceil(n*1.2) + 64;
+    if (CAP >= need) return;
+    CAP = need;
+    kid    = new Int32Array(CAP*4);
+    bcount = new Int32Array(CAP);
+    bodyIdx= new Int32Array(CAP*B);
+    mass = new Float64Array(CAP);
+    comx = new Float64Array(CAP);
+    comy = new Float64Array(CAP);
+    cx   = new Float64Array(CAP);
+    cy   = new Float64Array(CAP);
+    half = new Float64Array(CAP);
+  }
+  function newNode(x, y, h){
+    var i = used++;
+    kid[i*4]=kid[i*4+1]=kid[i*4+2]=kid[i*4+3]=-1;
+    bcount[i]=0; mass[i]=0; comx[i]=0; comy[i]=0;
+    cx[i]=x; cy[i]=y; half[i]=h;
+    return i;
+  }
+  function childOf(node, q){
+    var c = kid[node*4+q];
+    if (c >= 0) return c;
+    var h = half[node]*0.5;
+    c = newNode(cx[node] + (q&1 ? h : -h), cy[node] + (q&2 ? h : -h), h);
+    kid[node*4+q] = c;
+    return c;
+  }
+  function build(X, Y, M, alive, n){
+    ensure(n);
+    used = 0;
+    var minx=1e18,maxx=-1e18,miny=1e18,maxy=-1e18,i;
+    for (i=0;i<n;i++){
+      if (!alive[i] || M[i] < 1e-3) continue;
+      if (X[i]<minx)minx=X[i]; if (X[i]>maxx)maxx=X[i];
+      if (Y[i]<miny)miny=Y[i]; if (Y[i]>maxy)maxy=Y[i];
+    }
+    if (minx>maxx){ newNode(0,0,1); return used; }
+    var h0 = Math.max(maxx-minx, maxy-miny)*0.5 + 1;
+    var root = newNode((minx+maxx)*0.5, (miny+maxy)*0.5, h0);
+    for (i=0;i<n;i++){
+      if (!alive[i] || M[i] < 1e-3) continue;
+      var sp = 0;
+      pend[sp++]=i; pend[sp++]=root;
+      while (sp > 0){
+        var node = pend[--sp];
+        var b = pend[--sp];
+        for (var guard=0; guard<80; guard++){
+          mass[node] += M[b];
+          comx[node] += M[b]*X[b];
+          comy[node] += M[b]*Y[b];
+          if (bcount[node] >= 0){                 /* leaf */
+            if (bcount[node] < B){
+              bodyIdx[node*B + bcount[node]++] = b;
+              break;
+            }
+            if (half[node] < 1e-3){               /* degenerate pileup: overwrite-rotate */
+              bodyIdx[node*B + (guard % B)] = b;  /* keeps mass right, drops one index */
+              break;
+            }
+            /* split: demote residents one level (mass below split point
+               is added as they re-descend from the children) */
+            for (var k2=0;k2<B;k2++){
+              var r = bodyIdx[node*B + k2];
+              var rq = (X[r] >= cx[node] ? 1 : 0) + (Y[r] >= cy[node] ? 2 : 0);
+              var rc = childOf(node, rq);
+              if (sp >= pend.length-2){ var np=new Int32Array(pend.length*2); np.set(pend); pend=np; }
+              pend[sp++]=r; pend[sp++]=rc;
+            }
+            bcount[node] = -1;                     /* now internal */
+            /* fall through: current body b continues descending */
+          }
+          var q = (X[b] >= cx[node] ? 1 : 0) + (Y[b] >= cy[node] ? 2 : 0);
+          node = childOf(node, q);
+        }
+      }
+    }
+    for (i=0;i<used;i++){
+      if (mass[i] > 0){ comx[i] /= mass[i]; comy[i] /= mass[i]; }
+    }
+    return used;
+  }
+  var acc = new Float64Array(3);
+  function force(px, py, self, X, Y, M, G, theta2, eps2){
+    var fx=0, fy=0, phi=0, sp=0;
+    stack[sp++] = 0;
+    while (sp > 0){
+      var node = stack[--sp];
+      if (mass[node] <= 0) continue;
+      var bc = bcount[node];
+      if (bc >= 0){                                /* leaf bucket: exact pairwise */
+        var base = node*B;
+        for (var k=0;k<bc;k++){
+          var j = bodyIdx[base+k];
+          if (j === self) continue;
+          var dxj = X[j]-px, dyj = Y[j]-py;
+          var drj = dxj*dxj + dyj*dyj + eps2;
+          var invj = 1/Math.sqrt(drj);
+          var inv3j = invj*invj*invj;
+          var gm = G*M[j];
+          fx += gm*dxj*inv3j;
+          fy += gm*dyj*inv3j;
+          phi -= gm*invj;
+        }
+        continue;
+      }
+      var h2 = half[node];
+      var dxc = cx[node]-px, dyc = cy[node]-py;
+      var dc2 = dxc*dxc + dyc*dyc;
+      var s = h2*2;
+      var inside = px > cx[node]-h2 && px < cx[node]+h2 &&
+                   py > cy[node]-h2 && py < cy[node]+h2;
+      if (!inside && (s*s < theta2*dc2 || s*s < eps2*4.0)){
+        var dx = comx[node]-px, dy = comy[node]-py;
+        var dr2 = dx*dx + dy*dy + eps2;
+        var inv = 1/Math.sqrt(dr2);
+        var inv3 = inv*inv*inv;
+        var gm2 = G*mass[node];
+        fx += gm2*dx*inv3;
+        fy += gm2*dy*inv3;
+        phi -= gm2*inv;
+      } else {
+        for (var q=0;q<4;q++){
+          var c = kid[node*4+q];
+          if (c >= 0){
+            if (sp >= stack.length-4){ var ns=new Int32Array(stack.length*2); ns.set(stack); stack=ns; }
+            stack[sp++] = c;
+          }
+        }
+      }
+    }
+    acc[0]=fx; acc[1]=fy; acc[2]=phi;
+    return acc;
+  }
+  return { build:build, force:force, get nodes(){ return used; } };
+})();
+
+/* ==================================================================
+   SIM — bodies, symplectic leapfrog (KDK), galaxy factory, presets,
+   nuclei mergers, finger mass, energy / angular-momentum telemetry.
+   Pure typed arrays — no DOM, no THREE (renderer reads x/y).
+   ================================================================== */
+var SIM = (function(){
+  var MOBILE = Math.min(window.innerWidth, window.innerHeight) < 640 || !FINE;
+  var NMAX = MOBILE ? 9000 : 22000;
+  var G = 55;                     /* gravitational constant, px³/(m·s²)-ish */
+  var EPS = 6.0, EPS2 = EPS*EPS;  /* Plummer softening, px */
+  var THETA = 0.85, THETA2 = THETA*THETA;  /* center-distance MAC */
+  var DT = 1/120;                 /* base physics step, s */
+
+  var x  = new Float64Array(NMAX), y  = new Float64Array(NMAX);
+  var vx = new Float64Array(NMAX), vy = new Float64Array(NMAX);
+  var ax = new Float64Array(NMAX), ay = new Float64Array(NMAX);
+  var m  = new Float64Array(NMAX);
+  var alive = new Uint8Array(NMAX);
+  var kind  = new Uint8Array(NMAX);     /* 0 star · 1 nucleus · 2 test mote */
+  var n = 0;
+  var nuclei = [];                       /* body indices */
+  var finger = { on:false, x:0, y:0, m:0 };
+  var events = [];                       /* {type:'merge', x,y, m} */
+  var W = function(){ return window.innerWidth; };
+  var H = function(){ return window.innerHeight; };
+  var FAR2 = 0;
+  function refreshFar(){ var d = Math.hypot(W(),H()); FAR2 = (d*1.8)*(d*1.8); }
+  refreshFar();
+
+  function addBody(px,py,pvx,pvy,pm,pk){
+    if (n >= NMAX) return -1;
+    var i = n++;
+    x[i]=px; y[i]=py; vx[i]=pvx; vy[i]=pvy; m[i]=pm;
+    alive[i]=1; kind[i]=pk||0;
+    return i;
+  }
+  function reset(){
+    n = 0; nuclei.length = 0; events.length = 0;
+    finger.on = false; finger.m = 0;
+    E0 = null; L0 = null;
+  }
+
+  /* ---------- galaxy factory: exponential disc in centrifugal balance ---- */
+  function makeGalaxy(cx0, cy0, cvx, cvy, count, Rd, dir){
+    count = Math.max(0, Math.min(count, NMAX - n - 1));
+    if (count < 40) return -1;
+    var Mstar = 1.0;
+    var Mnuc = count * Mstar * 1.35;
+    var nuc = addBody(cx0, cy0, cvx, cvy, Mnuc, 1);
+    if (nuc >= 0) nuclei.push(nuc);
+    /* sample radii from exponential disc, truncated at 3.2 Rd */
+    var radii = [];
+    for (var i=0;i<count;i++){
+      var r;
+      do { r = -Rd * Math.log(1 - Math.random()); } while (r > Rd*3.2 || r < EPS*0.8);
+      radii.push(r);
+    }
+    radii.sort(function(a,b){ return a-b; });
+    var enc = Mnuc;
+    for (i=0;i<count;i++){
+      var r = radii[i];
+      enc += Mstar;
+      var th = Math.random()*TAU;
+      /* circular speed against enclosed mass, Plummer-softened */
+      var vc = Math.sqrt(G*enc*r*r/Math.pow(r*r+EPS2,1.5));
+      var sg = 0.05*vc;
+      var vt = vc + rand(-sg, sg);
+      var vr = rand(-sg, sg)*0.6;
+      var ct = Math.cos(th), st = Math.sin(th);
+      addBody(cx0 + r*ct, cy0 + r*st,
+              cvx + dir*(-st*vt) + ct*vr,
+              cvy + dir*( ct*vt) + st*vr,
+              Mstar, 0);
+    }
+    return nuc;
+  }
+  function makeCluster(cx0, cy0, count){
+    var Mn = count*2.2;
+    var nuc = addBody(cx0, cy0, 0, 0, Mn, 1);
+    if (nuc>=0) nuclei.push(nuc);
+    for (var i=0;i<count;i++){
+      var r = 8 + Math.random()*Math.random()*46;
+      var th = Math.random()*TAU;
+      var vc = Math.sqrt(G*(Mn + i*2.2)*r*r/Math.pow(r*r+EPS2,1.5));
+      var dir = Math.random()<0.5?-1:1;
+      addBody(cx0+r*Math.cos(th), cy0+r*Math.sin(th),
+              dir*(-Math.sin(th))*vc, dir*Math.cos(th)*vc, 2.2, 0);
+    }
+  }
+
+  /* ---------- trojan preset: L-point Newton solves --------------------- */
+  /* collinear L1/L2/L3: solve for x in rotating frame, star at -mu·a? We
+     use the standard normalized CR3BP: masses 1-mu at (-mu,0), mu at (1-mu,0),
+     unit separation, unit angular velocity. f(x) = x - (1-mu)(x+mu)/|x+mu|^3
+     - mu (x-1+mu)/|x-1+mu|^3.  Newton from good seeds. */
+  function collinearL(mu){
+    function f(xx){
+      var a = xx+mu, b = xx-1+mu;
+      return xx - (1-mu)*a/Math.pow(Math.abs(a),3) - mu*b/Math.pow(Math.abs(b),3);
+    }
+    function solve(x0){
+      var xx = x0;
+      for (var k=0;k<60;k++){
+        var h = 1e-6;
+        var d = (f(xx+h)-f(xx-h))/(2*h);
+        var step = f(xx)/d;
+        xx -= step;
+        if (Math.abs(step) < 1e-12) break;
+      }
+      return xx;
+    }
+    var c = Math.pow(mu/3, 1/3);
+    return {
+      L1: solve(1 - mu - c),
+      L2: solve(1 - mu + c),
+      L3: solve(-1 - (5/12)*mu)
+    };
+  }
+
+  var trojan = { active:false, star:-1, planet:-1, a:0, mu:0, L:null };
+  function presetTrojan(){
+    reset();
+    var cx0 = W()/2, cy0 = H()/2;
+    var a = Math.min(W(),H())*0.30;
+    var Ms = 5200, Mp = Ms*0.012;       /* μ ≈ 0.0119 < Gascheau 0.0385 → stable */
+    var mu = Mp/(Ms+Mp);
+    /* two-body circular pair about their barycenter */
+    var om = Math.sqrt(G*(Ms+Mp)/Math.pow(a*a+EPS2,1.5));  /* ω² = G·Mt/(a²+ε²)^{3/2} */
+    var rs = a*mu, rp = a*(1-mu);
+    var star = addBody(cx0 - rs, cy0, 0,  rs*om*-1, Ms, 1);
+    var planet = addBody(cx0 + rp, cy0, 0, rp*om, Mp, 1);
+    nuclei.push(star, planet);
+    /* motes: massless test particles sprinkled around the planet's orbit */
+    var motes = MOBILE ? 3200 : 7000;
+    for (var i=0;i<motes;i++){
+      var th = Math.random()*TAU;
+      var r = a * (0.86 + Math.random()*0.28);
+      var px = cx0 + r*Math.cos(th) - rs*0 , py = cy0 + r*Math.sin(th);
+      /* circular about the star-dominated center, barycentric */
+      var vc2 = Math.sqrt(G*(Ms+Mp)*r*r/Math.pow(r*r+EPS2,1.5));
+      addBody(px, py, -Math.sin(th)*vc2, Math.cos(th)*vc2, 1e-6, 2);
+    }
+    trojan.active = true; trojan.star = star; trojan.planet = planet;
+    trojan.a = a; trojan.mu = mu; trojan.L = collinearL(mu);
+  }
+  function presetDisc(){
+    reset(); trojan.active = false;
+    makeGalaxy(W()/2, H()/2, 0, 0, MOBILE ? 6800 : 13000, Math.min(W(),H())*0.115, 1);
+  }
+  function presetCollide(){
+    reset(); trojan.active = false;
+    var s = Math.min(W(),H());
+    var nA = MOBILE ? 3600 : 8500, nB = MOBILE ? 2600 : 6000;
+    makeGalaxy(W()*0.32, H()*0.60, 12, -9, nA, s*0.095, 1);
+    makeGalaxy(W()*0.70, H()*0.34, -16, 11, nB, s*0.075, -1);
+  }
+
+  /* ---------- forces + symplectic KDK leapfrog ------------------------- */
+  var potSum = 0;
+  function computeForces(){
+    TREE.build(x, y, m, alive, n);
+    potSum = 0;
+    for (var i=0;i<n;i++){
+      if (!alive[i]) continue;
+      var f = TREE.force(x[i], y[i], i, x, y, m, G, THETA2, EPS2);
+      var fx = f[0], fy = f[1];
+      potSum += 0.5 * m[i] * f[2];
+      if (finger.on && finger.m > 0){
+        var dx = finger.x - x[i], dy = finger.y - y[i];
+        var dr2 = dx*dx + dy*dy + 900;
+        var inv = 1/Math.sqrt(dr2);
+        var inv3 = inv*inv*inv;
+        fx += G * finger.m * dx * inv3;
+        fy += G * finger.m * dy * inv3;
+      }
+      ax[i] = fx; ay[i] = fy;
+    }
+  }
+  function kick(h){
+    for (var i=0;i<n;i++){ if (!alive[i]) continue; vx[i]+=ax[i]*h; vy[i]+=ay[i]*h; }
+  }
+  function drift(h){
+    for (var i=0;i<n;i++){ if (!alive[i]) continue; x[i]+=vx[i]*h; y[i]+=vy[i]*h; }
+  }
+  var primed = false;
+  function step(warp){
+    var sub = warp > 3 ? 3 : (warp > 1.5 ? 2 : 1);
+    var h = DT * warp / sub;
+    for (var s=0; s<sub; s++){
+      if (!primed){ computeForces(); primed = true; }
+      kick(h*0.5);
+      drift(h);
+      computeForces();
+      kick(h*0.5);
+    }
+    mergeNuclei();
+    cull();
+  }
+
+  /* ---------- nuclei mergers (momentum-conserving) ---------------------- */
+  function mergeNuclei(){
+    for (var a2=0; a2<nuclei.length; a2++){
+      var i = nuclei[a2];
+      if (!alive[i]) continue;
+      for (var b2=a2+1; b2<nuclei.length; b2++){
+        var j = nuclei[b2];
+        if (!alive[j]) continue;
+        var dx = x[j]-x[i], dy = y[j]-y[i];
+        if (dx*dx + dy*dy < EPS2*9){
+          var M2 = m[i]+m[j];
+          vx[i] = (m[i]*vx[i] + m[j]*vx[j]) / M2;
+          vy[i] = (m[i]*vy[i] + m[j]*vy[j]) / M2;
+          x[i]  = (m[i]*x[i]  + m[j]*x[j])  / M2;
+          y[i]  = (m[i]*y[i]  + m[j]*y[j])  / M2;
+          m[i] = M2;
+          alive[j] = 0;
+          events.push({ type:'merge', x:x[i], y:y[i], m:M2 });
+          primed = false;
+        }
+      }
+    }
+  }
+  function cull(){
+    var cx0 = W()/2, cy0 = H()/2;
+    for (var i=0;i<n;i++){
+      if (!alive[i] || kind[i]===1) continue;
+      var dx = x[i]-cx0, dy = y[i]-cy0;
+      if (dx*dx + dy*dy > FAR2) alive[i] = 0;
+    }
+  }
+
+  /* ---------- energy / angular momentum telemetry ----------------------- */
+  var E0 = null, L0 = null;
+  function measure(){
+    var ke = 0, Lz = 0, cmx = 0, cmy = 0, Mt = 0, live = 0;
+    var i;
+    for (i=0;i<n;i++){
+      if (!alive[i]) continue;
+      Mt += m[i]; cmx += m[i]*x[i]; cmy += m[i]*y[i]; live++;
+    }
+    if (Mt <= 0) return { live:0, dE:0, dL:0 };
+    cmx/=Mt; cmy/=Mt;
+    for (i=0;i<n;i++){
+      if (!alive[i]) continue;
+      ke += 0.5*m[i]*(vx[i]*vx[i]+vy[i]*vy[i]);
+      Lz += m[i]*((x[i]-cmx)*vy[i] - (y[i]-cmy)*vx[i]);
+    }
+    var E = ke + potSum;
+    if (E0 === null){ E0 = E; L0 = Lz; }
+    var dE = E0 !== 0 ? (E-E0)/Math.abs(E0) : 0;
+    var dL = L0 !== 0 ? (Lz-L0)/Math.abs(L0) : 0;
+    return { live:live, dE:dE, dL:dL };
+  }
+  function rebase(){ E0 = null; L0 = null; primed = false; }
+
+  /* ---------- sling preview: nuclei-only ballistic path ----------------- */
+  function previewPath(px, py, pvx, pvy, steps, hh){
+    var out = [];
+    var qx = px, qy = py, qvx = pvx, qvy = pvy;
+    for (var s2=0; s2<steps; s2++){
+      var fx=0, fy=0;
+      for (var k=0;k<nuclei.length;k++){
+        var i = nuclei[k];
+        if (!alive[i]) continue;
+        var dx = x[i]-qx, dy = y[i]-qy;
+        var dr2 = dx*dx+dy*dy+EPS2*4;
+        var inv = 1/Math.sqrt(dr2), inv3 = inv*inv*inv;
+        fx += G*m[i]*dx*inv3; fy += G*m[i]*dy*inv3;
+      }
+      qvx += fx*hh; qvy += fy*hh;
+      qx += qvx*hh; qy += qvy*hh;
+      if ((s2 & 3) === 0) out.push(qx, qy);
+    }
+    return out;
+  }
+
+  return {
+    step:step, reset:reset, rebase:rebase, measure:measure,
+    presetDisc:presetDisc, presetCollide:presetCollide, presetTrojan:presetTrojan,
+    makeGalaxy:makeGalaxy, makeCluster:makeCluster, previewPath:previewPath,
+    addBody:addBody,
+    collinearL:collinearL,
+    x:x, y:y, vx:vx, vy:vy, m:m, alive:alive, kind:kind,
+    get n(){ return n; }, nuclei:nuclei, finger:finger, events:events,
+    trojan:trojan, MOBILE:MOBILE, NMAX:NMAX, G:G, EPS:EPS, DT:DT, THETA2:THETA2,
+    get treeNodes(){ return TREE.nodes; }
+  };
+})();
+
+/* ==================================================================
+   RENDER — three.js points into a fading trail buffer, composited
+   over the atlas field with plate grain.
+   ================================================================== */
+var RENDER = (function(){
+  var renderer, ptScene, quadScene, cam, ptGeom, ptMat;
+  var trailA, trailB, fadeMat, compMat, quadMesh;
+  var posAttr, briAttr;
+  var trailsOn = true;
+  var supported = false;
+
+  var PT_VS = [
+    'attribute float aBri;',
+    'uniform vec2 uRes;',
+    'uniform float uSize;',
+    'varying float vB;',
+    'void main(){',
+    '  vec2 clip = vec2(position.x/uRes.x*2.0-1.0, 1.0-position.y/uRes.y*2.0);',
+    '  gl_Position = vec4(clip, 0.0, 1.0);',
+    '  gl_PointSize = uSize * (0.8 + aBri*0.9);',
+    '  vB = aBri;',
+    '}'
+  ].join('\n');
+  var PT_FS = [
+    'precision highp float;',
+    'varying float vB;',
+    'void main(){',
+    '  vec2 c = gl_PointCoord - 0.5;',
+    '  float d2 = dot(c,c);',
+    '  if (d2 > 0.25) discard;',
+    '  float fall = 1.0 - smoothstep(0.0, 0.25, d2);',
+    '  gl_FragColor = vec4(vec3(fall * (0.16 + vB*0.5)), 1.0);',
+    '}'
+  ].join('\n');
+  var FADE_FS = [
+    'precision highp float;',
+    'varying vec2 vUv;',
+    'uniform sampler2D uSrc;',
+    'uniform float uFade;',
+    'void main(){',
+    '  gl_FragColor = vec4(texture2D(uSrc, vUv).rgb * uFade, 1.0);',
+    '}'
+  ].join('\n');
+  var QUAD_VS = [
+    'varying vec2 vUv;',
+    'void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }'
+  ].join('\n');
+  var COMP_FS = [
+    'precision highp float;',
+    'varying vec2 vUv;',
+    'uniform sampler2D uTrail;',
+    'uniform vec3 uNight0;',
+    'uniform vec3 uNight1;',
+    'uniform vec3 uPlate;',
+    'uniform vec3 uGold;',
+    'uniform float uTime;',
+    'float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }',
+    'void main(){',
+    '  vec2 cc = vUv - vec2(0.5, 0.58);',
+    '  float rr = dot(cc,cc);',
+    '  vec3 col = mix(uNight1, uNight0, clamp(rr*2.2, 0.0, 1.0));',
+    '  float t = texture2D(uTrail, vUv).r;',
+    '  vec3 star = mix(uPlate, uGold, clamp(t*0.5 - 0.35, 0.0, 0.35));',
+    '  col += star * t * 1.15;',
+    '  float g = hash(vUv*vec2(917.0,613.0) + floor(uTime*9.0));',
+    '  col += (g - 0.5) * 0.016;',
+    '  col *= 1.0 - rr*0.35;',
+    '  gl_FragColor = vec4(col, 1.0);',
+    '}'
+  ].join('\n');
+
+  function rt(w,h){
+    return new THREE.WebGLRenderTarget(w, h, {
+      wrapS:THREE.ClampToEdgeWrapping, wrapT:THREE.ClampToEdgeWrapping,
+      minFilter:THREE.NearestFilter, magFilter:THREE.NearestFilter,
+      format:THREE.RGBAFormat, type:THREE.HalfFloatType,
+      depthBuffer:false, stencilBuffer:false });
+  }
+  function init(){
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias:false, alpha:false, powerPreference:'high-performance' });
+    } catch(e){ return false; }
+    renderer.setPixelRatio(1);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.getElementById('gl').appendChild(renderer.domElement);
+    renderer.domElement.style.width='100%';
+    renderer.domElement.style.height='100%';
+
+    cam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+    var tw = Math.round(window.innerWidth*0.75), th = Math.round(window.innerHeight*0.75);
+    trailA = rt(tw,th); trailB = rt(tw,th);
+    renderer.setClearColor(0x000000, 1);
+    renderer.setRenderTarget(trailA); renderer.clear();
+    renderer.setRenderTarget(trailB); renderer.clear();
+    renderer.setRenderTarget(null);
+
+    ptGeom = new THREE.BufferGeometry();
+    posAttr = new THREE.BufferAttribute(new Float32Array(SIM.NMAX*3), 3)
+      .setUsage(THREE.DynamicDrawUsage);
+    briAttr = new THREE.BufferAttribute(new Float32Array(SIM.NMAX), 1)
+      .setUsage(THREE.DynamicDrawUsage);
+    ptGeom.setAttribute('position', posAttr);
+    ptGeom.setAttribute('aBri', briAttr);
+    ptGeom.setDrawRange(0,0);
+    ptMat = new THREE.ShaderMaterial({
+      vertexShader:PT_VS, fragmentShader:PT_FS,
+      uniforms:{ uRes:{value:new THREE.Vector2(window.innerWidth, window.innerHeight)},
+                 uSize:{value: SIM.MOBILE ? 1.6 : 1.9} },
+      transparent:true, depthTest:false, depthWrite:false,
+      blending:THREE.AdditiveBlending
+    });
+    ptScene = new THREE.Scene();
+    var pts = new THREE.Points(ptGeom, ptMat);
+    pts.frustumCulled = false;
+    ptScene.add(pts);
+
+    quadScene = new THREE.Scene();
+    quadMesh = new THREE.Mesh(new THREE.PlaneGeometry(2,2), null);
+    quadMesh.frustumCulled = false;
+    quadScene.add(quadMesh);
+    fadeMat = new THREE.ShaderMaterial({ vertexShader:QUAD_VS, fragmentShader:FADE_FS,
+      uniforms:{ uSrc:{value:null}, uFade:{value:0.938} },
+      depthTest:false, depthWrite:false });
+    compMat = new THREE.ShaderMaterial({ vertexShader:QUAD_VS, fragmentShader:COMP_FS,
+      uniforms:{
+        uTrail:{value:null}, uTime:{value:0},
+        uNight0:{value:new THREE.Color('#0a1120')},
+        uNight1:{value:new THREE.Color('#15264a')},
+        uPlate:{value:new THREE.Color('#f0e6cf')},
+        uGold: {value:new THREE.Color('#c9a24d')}
+      }, depthTest:false, depthWrite:false });
+    supported = true;
+    return true;
+  }
+  function frame(time){
+    if (!supported) return;
+    var N = SIM.n, live = 0;
+    var pa = posAttr.array, ba = briAttr.array;
+    for (var i=0;i<N;i++){
+      if (!SIM.alive[i]) continue;
+      pa[live*3]   = SIM.x[i];
+      pa[live*3+1] = SIM.y[i];
+      pa[live*3+2] = 0;
+      var sp = Math.hypot(SIM.vx[i], SIM.vy[i]);
+      ba[live] = SIM.kind[i]===1 ? 1.0 : clamp(0.28 + sp*0.004, 0.2, 0.85);
+      live++;
+    }
+    posAttr.needsUpdate = true;
+    briAttr.needsUpdate = true;
+    ptGeom.setDrawRange(0, live);
+
+    /* fade previous trail into B, draw points on top, swap */
+    fadeMat.uniforms.uSrc.value = trailA.texture;
+    fadeMat.uniforms.uFade.value = trailsOn ? 0.936 : 0.30;
+    quadMesh.material = fadeMat;
+    renderer.setRenderTarget(trailB);
+    renderer.render(quadScene, cam);
+    renderer.render(ptScene, cam);
+    var t2 = trailA; trailA = trailB; trailB = t2;
+
+    compMat.uniforms.uTrail.value = trailA.texture;
+    compMat.uniforms.uTime.value = time;
+    quadMesh.material = compMat;
+    renderer.setRenderTarget(null);
+    renderer.render(quadScene, cam);
+  }
+  function resize(){
+    if (!supported) return;
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    ptMat.uniforms.uRes.value.set(window.innerWidth, window.innerHeight);
+    var tw = Math.round(window.innerWidth*0.75), th = Math.round(window.innerHeight*0.75);
+    trailA.setSize(tw,th); trailB.setSize(tw,th);
+  }
+  function setTrails(v){ trailsOn = v; }
+  return { init:init, frame:frame, resize:resize, setTrails:setTrails };
+})();
+
+/* ==================================================================
+   OVERLAY — 2D atlas chrome: nucleus glyphs, sling vector + predicted
+   path, Lagrange markers in trojan mode, scale ruler.
+   ================================================================== */
+var OVERLAY = (function(){
+  var cv = document.getElementById('overlay');
+  var ctx = cv.getContext('2d');
+  var DPR = Math.min(window.devicePixelRatio||1, 2);
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio||1, 2);
+    cv.width = window.innerWidth*DPR; cv.height = window.innerHeight*DPR;
+  }
+  resize();
+  var sling = null;   /* {x0,y0,x1,y1,path:[]} set by UI */
+  function setSling(s){ sling = s; }
+
+  function draw(time){
+    var w = cv.width, h = cv.height;
+    ctx.clearRect(0,0,w,h);
+    var gold = '#c9a24d';
+
+    /* nucleus glyphs: double ring + heading tick */
+    for (var k=0;k<SIM.nuclei.length;k++){
+      var i = SIM.nuclei[k];
+      if (!SIM.alive[i]) continue;
+      var px = SIM.x[i]*DPR, py = SIM.y[i]*DPR;
+      var r = (6 + Math.log(SIM.m[i])*0.9)*DPR;
+      ctx.strokeStyle = gold; ctx.lineWidth = 1.1*DPR;
+      ctx.beginPath(); ctx.arc(px,py,r,0,TAU); ctx.stroke();
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath(); ctx.arc(px,py,r*1.8,0,TAU); ctx.stroke();
+      ctx.globalAlpha = 1;
+      var a = Math.atan2(SIM.vy[i], SIM.vx[i]);
+      ctx.beginPath();
+      ctx.moveTo(px+Math.cos(a)*r*1.8, py+Math.sin(a)*r*1.8);
+      ctx.lineTo(px+Math.cos(a)*r*2.6, py+Math.sin(a)*r*2.6);
+      ctx.stroke();
+    }
+
+    /* trojan Lagrange markers in the co-rotating geometry */
+    if (SIM.trojan.active && SIM.alive[SIM.trojan.star] && SIM.alive[SIM.trojan.planet]){
+      var s = SIM.trojan, si = s.star, pi = s.planet;
+      var sx = SIM.x[si], sy = SIM.y[si];
+      var pxr = SIM.x[pi], pyr = SIM.y[pi];
+      var bx = (SIM.m[si]*sx + SIM.m[pi]*pxr)/(SIM.m[si]+SIM.m[pi]);
+      var by = (SIM.m[si]*sy + SIM.m[pi]*pyr)/(SIM.m[si]+SIM.m[pi]);
+      var ang = Math.atan2(pyr-by, pxr-bx);
+      var aSep = Math.hypot(pxr-sx, pyr-sy);
+      function mark(xn, yn, label){
+        /* normalized CR3BP coords → world: barycenter origin, x̂ toward planet */
+        var wx = bx + (xn*Math.cos(ang) - yn*Math.sin(ang))*aSep;
+        var wy = by + (xn*Math.sin(ang) + yn*Math.cos(ang))*aSep;
+        var mx = wx*DPR, my = wy*DPR;
+        ctx.strokeStyle = gold; ctx.lineWidth = 1*DPR;
+        ctx.globalAlpha = 0.85;
+        ctx.beginPath();
+        ctx.moveTo(mx-4*DPR,my); ctx.lineTo(mx+4*DPR,my);
+        ctx.moveTo(mx,my-4*DPR); ctx.lineTo(mx,my+4*DPR);
+        ctx.stroke();
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = gold;
+        ctx.font = (9*DPR)+'px "Spline Sans Mono"';
+        ctx.fillText(label, mx+6*DPR, my-5*DPR);
+        ctx.globalAlpha = 1;
+      }
+      var L = s.L;
+      mark(L.L1, 0, 'L1'); mark(L.L2, 0, 'L2'); mark(L.L3, 0, 'L3');
+      mark(0.5 - s.mu,  Math.sqrt(3)/2, 'L4');
+      mark(0.5 - s.mu, -Math.sqrt(3)/2, 'L5');
+    }
+
+    /* sling */
+    if (sling){
+      ctx.strokeStyle = gold; ctx.lineWidth = 1.2*DPR;
+      ctx.setLineDash([5*DPR,5*DPR]);
+      ctx.beginPath();
+      ctx.moveTo(sling.x0*DPR, sling.y0*DPR);
+      ctx.lineTo(sling.x1*DPR, sling.y1*DPR);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (sling.path && sling.path.length > 3){
+        ctx.globalAlpha = 0.55;
+        ctx.beginPath();
+        ctx.moveTo(sling.path[0]*DPR, sling.path[1]*DPR);
+        for (var q=2;q<sling.path.length;q+=2)
+          ctx.lineTo(sling.path[q]*DPR, sling.path[q+1]*DPR);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      ctx.fillStyle = gold;
+      ctx.beginPath(); ctx.arc(sling.x0*DPR, sling.y0*DPR, 3*DPR, 0, TAU); ctx.fill();
+    }
+
+    /* scale ruler, bottom center */
+    var rl = 120*DPR, rx = w/2 - rl/2, ry = h - 46*DPR;
+    ctx.strokeStyle = 'rgba(201,162,77,0.5)'; ctx.lineWidth = 1*DPR;
+    ctx.beginPath();
+    ctx.moveTo(rx, ry); ctx.lineTo(rx+rl, ry);
+    ctx.moveTo(rx, ry-3*DPR); ctx.lineTo(rx, ry+3*DPR);
+    ctx.moveTo(rx+rl, ry-3*DPR); ctx.lineTo(rx+rl, ry+3*DPR);
+    ctx.stroke();
+  }
+  return { draw:draw, resize:resize, setSling:setSling };
+})();
+
+/* ==================================================================
+   SOUND — opt-in: deep bed + Kepler chirp. The chirp frequency is the
+   literal orbital frequency of the closest nucleus pair,
+   f = √(G(M₁+M₂)/d³), scaled into the audible register; a merger
+   lands a thump with ring-down.
+   ================================================================== */
+var SOUND = (function(){
+  var on = false, built = false;
+  var master, chirp, chirpGain, bed, thump;
+  function build(){
+    master = new Tone.Gain(0).toDestination();
+    var verb = new Tone.Freeverb({ roomSize:0.6, wet:0.3 }).connect(master);
+    bed = new Tone.Oscillator(46, 'sine').start();
+    var bedG = new Tone.Gain(0.05).connect(verb);
+    bed.connect(bedG);
+    var air = new Tone.Noise('brown').start();
+    var airF = new Tone.Filter(160, 'lowpass').connect(verb);
+    air.volume.value = -30; air.connect(airF);
+    chirpGain = new Tone.Gain(0).connect(verb);
+    chirp = new Tone.Oscillator(80, 'triangle').start();
+    chirp.volume.value = -12;
+    chirp.connect(chirpGain);
+    thump = new Tone.MembraneSynth({ pitchDecay:0.06, octaves:5,
+      envelope:{ attack:0.001, decay:0.9, sustain:0 } }).connect(verb);
+    built = true;
+  }
+  function toggle(){
+    if (!HAS_TONE) return false;
+    if (!built){ Tone.start().then(function(){ build(); on = true; ramp(); }); return true; }
+    on = !on; ramp(); return on;
+  }
+  function ramp(){ if (built) master.gain.rampTo(on ? 0.8 : 0, 0.4); }
+  function update(){
+    if (!built || !on) return;
+    /* closest live nucleus pair */
+    var best = -1, bi=-1, bj=-1;
+    for (var a=0;a<SIM.nuclei.length;a++){
+      var i = SIM.nuclei[a]; if (!SIM.alive[i]) continue;
+      for (var b=a+1;b<SIM.nuclei.length;b++){
+        var j = SIM.nuclei[b]; if (!SIM.alive[j]) continue;
+        var d = Math.hypot(SIM.x[j]-SIM.x[i], SIM.y[j]-SIM.y[i]);
+        if (best<0 || d<best){ best=d; bi=i; bj=j; }
+      }
+    }
+    if (bi<0){ chirpGain.gain.rampTo(0, 0.3); return; }
+    var f = Math.sqrt(SIM.G*(SIM.m[bi]+SIM.m[bj])/Math.pow(best,3));
+    var audible = clamp(40 + f*520, 40, 1100);
+    chirp.frequency.rampTo(audible, 0.1);
+    var g = clamp(1 - best/(Math.min(window.innerWidth,window.innerHeight)*0.5), 0, 1);
+    chirpGain.gain.rampTo(g*g*0.5, 0.15);
+  }
+  function onMerge(mm){
+    if (!built || !on) return;
+    var note = clamp(120 - Math.log(mm)*6, 30, 120);
+    try { thump.triggerAttackRelease(note, 0.5); } catch(e){}
+  }
+  return { toggle:toggle, update:update, onMerge:onMerge, get on(){ return on; } };
+})();
+
+/* ==================================================================
+   UI — machine, warp lever (lenis), sling/finger pointer, chips,
+   keys, boot, main loop
+   ================================================================== */
+var machine = createMachine({
+  initial: 'boot',
+  states: {
+    boot:  { on: { DONE: 'space' } },
+    space: { entry: function(){ document.body.classList.remove('pre'); } }
+  }
+});
+
+function springPress(el){
+  if (RM) return;
+  var s = { v:0, x:1 }, target = 0.93, k=340, c=16;
+  if (el._sprRaf) cancelAnimationFrame(el._sprRaf);
+  var releasing = false, last = performance.now();
+  function tick(now){
+    var dt = Math.min((now-last)/1000, 0.03); last = now;
+    var goal = releasing ? 1 : target;
+    s.v += (-k*(s.x-goal) - c*s.v)*dt; s.x += s.v*dt;
+    el.style.transform = 'scale('+s.x.toFixed(4)+')';
+    if (releasing && Math.abs(s.x-1)<0.001 && Math.abs(s.v)<0.01){
+      el.style.transform=''; el._sprRaf=null; return;
+    }
+    el._sprRaf = requestAnimationFrame(tick);
+  }
+  el._sprRaf = requestAnimationFrame(tick);
+  setTimeout(function(){ releasing = true; }, 90);
+}
+
+var LEVER = (function(){
+  var el = document.getElementById('lever');
+  var grip = document.getElementById('grip');
+  var val = document.getElementById('lever-val');
+  var MINW = 0.25, MAXW = 6;
+  var target = 1, smooth = 1, dragging = false;
+  function setFromY(clientY){
+    var r = el.getBoundingClientRect();
+    var t = clamp(1 - (clientY - r.top - 14)/(r.height - 28), 0, 1);
+    target = MINW * Math.pow(MAXW/MINW, t);
+  }
+  el.addEventListener('pointerdown', function(e){
+    dragging = true; el.setPointerCapture(e.pointerId); setFromY(e.clientY);
+  });
+  el.addEventListener('pointermove', function(e){ if (dragging) setFromY(e.clientY); });
+  el.addEventListener('pointerup', function(){ dragging = false; });
+  el.addEventListener('pointercancel', function(){ dragging = false; });
+  window.addEventListener('wheel', function(e){
+    if (machine.state !== 'space') return;
+    target = clamp(target * Math.pow(1.0015, -e.deltaY), MINW, MAXW);
+  }, { passive:true });
+  function tick(dt){
+    smooth += (target - smooth) * (1 - Math.pow(0.002, dt));
+    var t = Math.log(smooth/MINW)/Math.log(MAXW/MINW);
+    grip.style.top = (14 + (1-t)*(el.clientHeight-28-18)) + 'px';
+    val.textContent = smooth.toFixed(smooth<1?2:1)+'×';
+  }
+  function setTarget(w){ target = clamp(w, MINW, MAXW); }
+  return { tick:tick, setTarget:setTarget, get warp(){ return smooth; } };
+})();
+
+/* ---------- pointer: sling / finger / cluster tap ---------- */
+var PTR = (function(){
+  var mode = null;      /* 'sling' | 'finger' */
+  var downX=0, downY=0, downT=0, curX=0, curY=0;
+  var holdTimer = null;
+  var cur = document.getElementById('cur');
+  window.addEventListener('pointerdown', function(e){
+    if (e.target.closest('button') || e.target.closest('#lever')) return;
+    if (machine.state !== 'space') return;
+    downX = curX = e.clientX; downY = curY = e.clientY;
+    downT = performance.now();
+    mode = 'pending';
+    holdTimer = setTimeout(function(){
+      if (mode === 'pending'){
+        mode = 'finger';
+        SIM.finger.on = true;
+        SIM.finger.x = curX; SIM.finger.y = curY;
+        SIM.finger.m = 0;
+        gsap.to(SIM.finger, { m: 14000, duration: 0.6, ease: 'power2.out' });
+      }
+    }, 260);
+  });
+  window.addEventListener('pointermove', function(e){
+    if (cur){ cur.style.left = e.clientX+'px'; cur.style.top = e.clientY+'px'; }
+    if (!mode || machine.state !== 'space') return;
+    curX = e.clientX; curY = e.clientY;
+    if (mode === 'pending' && Math.hypot(curX-downX, curY-downY) > 14){
+      mode = 'sling';
+      clearTimeout(holdTimer);
+    }
+    if (mode === 'sling'){
+      var pvx = (downX - curX) * 1.6;
+      var pvy = (downY - curY) * 1.6;
+      OVERLAY.setSling({ x0:downX, y0:downY, x1:curX, y1:curY,
+        path: SIM.previewPath(downX, downY, pvx, pvy, 260, SIM.DT*5) });
+    }
+    if (mode === 'finger'){
+      SIM.finger.x = curX; SIM.finger.y = curY;
+    }
+  });
+  function up(e){
+    clearTimeout(holdTimer);
+    if (!mode) return;
+    if (mode === 'sling'){
+      var pvx = (downX - curX) * 1.6;
+      var pvy = (downY - curY) * 1.6;
+      var cnt = SIM.MOBILE ? 1600 : 3600;
+      SIM.makeGalaxy(downX, downY, pvx, pvy, cnt,
+        Math.min(window.innerWidth, window.innerHeight)*0.055, Math.random()<0.5?1:-1);
+      SIM.rebase();
+      OVERLAY.setSling(null);
+    } else if (mode === 'finger'){
+      gsap.killTweensOf(SIM.finger);
+      gsap.to(SIM.finger, { m: 0, duration: 0.35, ease: 'power2.in',
+        onComplete: function(){ SIM.finger.on = false; } });
+    } else if (mode === 'pending'){
+      if (performance.now() - downT < 260){
+        SIM.makeCluster(downX, downY, SIM.MOBILE ? 220 : 380);
+        SIM.rebase();
+      }
+    }
+    mode = null;
+  }
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+  return {};
+})();
+
+/* ---------- preset chips + morph glyph ---------- */
+var CHIP_GLYPHS = [
+  [8,2, 13,5.5, 13,10.5, 8,14, 3,10.5, 3,5.5],
+  [8,1, 14,8, 8,15, 2,8],
+  [8,2, 12,4, 14,8, 12,12, 8,14, 4,12, 2,8, 4,4]
+];
+var chipM = 36;
+var chipShapes = CHIP_GLYPHS.map(function(g){ return MORPH.resample(new Float32Array(g), chipM); });
+var chipCur = chipShapes[0].slice(0);
+var chipPathEl = document.getElementById('chip-path');
+var chipTween = { t:0 }, chipFrom = chipShapes[0], chipTo = chipShapes[0], galCount = 0;
+function morphChip(){
+  var next = chipShapes[galCount % chipShapes.length];
+  if (RM){ chipPathEl.setAttribute('d', MORPH.toPath(next,1,1)); return; }
+  chipFrom = chipCur.slice(0); chipTo = next; chipTween.t = 0;
+  gsap.to(chipTween, { t:1, duration:0.5, ease:'power2.inOut', onUpdate:function(){
+    MORPH.mix(chipFrom, chipTo, chipTween.t, chipCur);
+    chipPathEl.setAttribute('d', MORPH.toPath(chipCur,1,1));
+  }});
+}
+function setMode(mi){
+  var ids = ['m-disc','m-collide','m-trojan'];
+  for (var i=0;i<3;i++) document.getElementById(ids[i]).classList.toggle('on', i===mi);
+  if (mi===0) SIM.presetDisc();
+  else if (mi===1) SIM.presetCollide();
+  else SIM.presetTrojan();
+  SIM.rebase();
+  document.getElementById('hint').textContent = mi===2
+    ? 'motes gather at L4 · L5 — the trojan points · hold for a finger of mass'
+    : 'drag — sling a galaxy · hold — finger of mass · tap — star cluster · wheel — warp';
+  if (!RM) gsap.fromTo('#gl', { opacity: 0.4 }, { opacity: 1, duration: 0.8, ease: 'power2.out' });
+}
+document.getElementById('m-disc').addEventListener('click', function(){ setMode(0); springPress(this); });
+document.getElementById('m-collide').addEventListener('click', function(){ setMode(1); springPress(this); });
+document.getElementById('m-trojan').addEventListener('click', function(){ setMode(2); springPress(this); });
+document.getElementById('k-galaxy').addEventListener('click', function(){
+  var a = rand(0, TAU), rr = Math.min(window.innerWidth,window.innerHeight)*0.33;
+  SIM.makeGalaxy(window.innerWidth/2 + Math.cos(a)*rr, window.innerHeight/2 + Math.sin(a)*rr,
+    -Math.cos(a)*26, -Math.sin(a)*26, SIM.MOBILE?1600:3600,
+    Math.min(window.innerWidth,window.innerHeight)*0.055, Math.random()<0.5?1:-1);
+  SIM.rebase(); galCount++; morphChip(); springPress(this);
+});
+document.getElementById('k-trails').addEventListener('click', function(){
+  var onNow = this.classList.toggle('on');
+  RENDER.setTrails(onNow);
+  springPress(this);
+});
+document.getElementById('k-sound').addEventListener('click', function(){
+  var on = SOUND.toggle();
+  this.classList.toggle('on', !!on);
+  springPress(this);
+});
+document.getElementById('k-reset').addEventListener('click', function(){
+  var mi = document.getElementById('m-collide').classList.contains('on') ? 1 :
+           (document.getElementById('m-trojan').classList.contains('on') ? 2 : 0);
+  setMode(mi);
+  springPress(this);
+});
+window.addEventListener('keydown', function(e){
+  if (machine.state !== 'space') return;
+  var k = e.key.toLowerCase();
+  if (k==='1') setMode(0);
+  else if (k==='2') setMode(1);
+  else if (k==='3') setMode(2);
+  else if (k==='g') document.getElementById('k-galaxy').click();
+  else if (k==='t') document.getElementById('k-trails').click();
+  else if (k==='s') document.getElementById('k-sound').click();
+  else if (k==='r') document.getElementById('k-reset').click();
+});
+
+/* ---------- boot ---------- */
+var booted = false;
+function finishBoot(){
+  if (booted) return; booted = true;
+  machine.send('DONE');
+  var veil = document.getElementById('veil');
+  if (RM){ veil.style.display='none'; }
+  else {
+    gsap.to(veil, { opacity: 0, duration: 0.8, ease: 'power2.inOut',
+      onComplete: function(){ veil.style.display = 'none'; } });
+  }
+  veil.classList.add('done');
+  gsap.to('#hint', { opacity: 0.9, duration: 1.2, delay: 0.4 });
+  gsap.to('#hint', { opacity: 0, duration: 1.2, delay: 7.5 });
+}
+function boot(){
+  var ok = RENDER.init();
+  if (!ok){
+    document.getElementById('nogl').style.display = 'flex';
+    document.getElementById('veil').style.display = 'none';
+    return;
+  }
+  SIM.presetDisc();
+  SIM.rebase();
+  document.getElementById('t-n').textContent = (SIM.n/1000).toFixed(1)+'k';
+  if (RM){
+    document.getElementById('knit').textContent = 'field ready';
+    finishBoot();
+  } else {
+    var spans = document.querySelectorAll('#word span');
+    if (HAS_ANIME){
+      anime({ targets: spans, translateY: [-100, 0], opacity: [0, 1],
+        delay: anime.stagger(80), duration: 950, easing: 'easeOutElastic(1, .5)' });
+    } else {
+      gsap.fromTo(spans, { y:-100, opacity:0 },
+        { y:0, opacity:1, stagger:0.08, duration:0.85, ease:'elastic.out(1,0.5)' });
+    }
+    var kn = { v: 0 }, knit = document.getElementById('knit');
+    gsap.to(kn, { v: SIM.n, duration: 1.7, ease: 'power3.out', onUpdate: function(){
+      knit.textContent = 'seeding ' + Math.round(kn.v).toLocaleString() +
+        ' bodies — building quadtree';
+    }});
+    gsap.delayedCall(2.6, finishBoot);
+  }
+}
+
+/* ---------- main loop ---------- */
+var lastT = performance.now(), fpsAcc=0, fpsN=0, teleT=0, frame=0;
+function loop(now){
+  requestAnimationFrame(loop);
+  var dt = Math.min((now - lastT)/1000, 0.05);
+  lastT = now;
+  if (document.hidden) return;
+  var time = now/1000;
+
+  LEVER.tick(dt);
+  SIM.step(LEVER.warp);
+
+  /* merge events → sound */
+  while (SIM.events.length){
+    var ev = SIM.events.shift();
+    if (ev.type === 'merge'){
+      SOUND.onMerge(ev.m);
+      if (!RM) gsap.fromTo('#stage', { x:0 }, { x:2.5, duration:0.05, yoyo:true,
+        repeat:5, ease:'sine.inOut', onComplete:function(){ gsap.set('#stage',{x:0}); } });
+    }
+  }
+  if ((frame & 3) === 0) SOUND.update();
+
+  RENDER.frame(time);
+  OVERLAY.draw(time);
+
+  fpsAcc += 1/Math.max(dt,1e-3); fpsN++; teleT += dt; frame++;
+  if (teleT > 0.5){
+    var mm = SIM.measure();
+    document.getElementById('t-fps').textContent = Math.round(fpsAcc/fpsN);
+    document.getElementById('t-n').textContent = (mm.live/1000).toFixed(1)+'k';
+    document.getElementById('t-tree').textContent = (SIM.treeNodes/1000).toFixed(1)+'k';
+    document.getElementById('t-e').textContent = (mm.dE*100).toFixed(2)+'%';
+    document.getElementById('t-l').textContent = (mm.dL*100).toFixed(2)+'%';
+    fpsAcc=0; fpsN=0; teleT=0;
+  }
+}
+
+window.addEventListener('resize', function(){ RENDER.resize(); OVERLAY.resize(); });
+document.addEventListener('visibilitychange', function(){ lastT = performance.now(); });
+
+boot();
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
