@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>SALON · seven studies</title>
+<!--
+   SALON — seven studies · experiment 08
+   The exhibition: seven prior systems re-derived as live dioramas —
+   springs (FLUX), flow-field ink (SUMI), SPH liquid (BASIN), Chladni
+   resonance (EIGEN), XPBD soft body (PULP), Eulerian Navier-Stokes
+   (SHEAR), direct N-body gravity (TIDE) — bound by a scroll spine,
+   a nine-state statechart, morphing rail glyphs, and a matter.js
+   colophon. Room VIII stands reserved for the microphone study.
+   three.js r128 · gsap · anime.js · matter.js · cdnjs only.
+   Flubber morphs / statechart / lenis smoothing / framer springs are
+   faithful inline implementations.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Chivo+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --wall:#f2efe9; --wall2:#eae6dd;
+  --ink:#1b1a17; --ink-soft:#57534a;
+  --hair:#ccc6b8; --red:#c22f1e;
+}
+*{ margin:0; padding:0; box-sizing:border-box; }
+html{ scroll-behavior:auto; }
+body{
+  background:var(--wall);
+  color:var(--ink);
+  font-family:'Chivo Mono',ui-monospace,monospace;
+  font-size:11px; letter-spacing:.02em;
+  -webkit-tap-highlight-color:transparent;
+  overflow-x:hidden;
+}
+#spacer{ width:1px; }
+#world{ position:fixed; inset:0 auto auto 0; width:100%; will-change:transform; }
+#dust{ position:fixed; inset:0; z-index:0; pointer-events:none; }
+#dust canvas{ display:block; width:100%; height:100%; }
+
+section{ position:relative; min-height:100vh; display:flex;
+  align-items:center; justify-content:center; padding:8vh 6vw; z-index:2; }
+.folio{
+  position:absolute; top:6vh; right:6vw;
+  font-family:'Newsreader',serif; font-style:italic; font-weight:400;
+  font-size:clamp(60px,9vw,120px); line-height:1; color:transparent;
+  -webkit-text-stroke:1px var(--hair);
+}
+.room{ display:grid; grid-template-columns:minmax(240px,320px) minmax(0,1fr);
+  gap:5vw; align-items:center; width:min(1200px,100%); }
+.caption h2{
+  font-family:'Newsreader',serif; font-weight:500; font-size:34px;
+  letter-spacing:.02em; margin-bottom:10px;
+}
+.caption h2 i{ font-style:italic; font-weight:400; color:var(--ink-soft); font-size:22px; margin-left:6px; }
+.caption .medium{ font-size:10px; text-transform:uppercase; letter-spacing:.18em;
+  color:var(--ink-soft); margin-bottom:18px; }
+.caption p{
+  font-family:'Newsreader',serif; font-size:17.5px; line-height:1.62;
+  color:var(--ink); max-width:34ch;
+}
+.caption .hintline{ margin-top:16px; font-size:9.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-soft); }
+.vitrine{
+  position:relative; width:100%; aspect-ratio:4/3;
+  max-height:66vh; justify-self:center;
+  border:1px solid var(--hair);
+  box-shadow:0 24px 60px -30px rgba(27,26,23,.35), 0 2px 0 #fff inset;
+  background:#111; overflow:hidden; touch-action:none;
+}
+.vitrine canvas{ display:block; width:100%; height:100%; }
+.plate{ position:absolute; left:50%; bottom:-34px; transform:translateX(-50%);
+  font-size:8.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--ink-soft);
+  white-space:nowrap; }
+
+/* foyer */
+#s-foyer{ flex-direction:column; text-align:center; gap:26px; }
+#s-foyer h1{
+  font-family:'Newsreader',serif; font-weight:500;
+  font-size:clamp(72px,16vw,190px); line-height:.92; letter-spacing:.02em;
+}
+#s-foyer h1 span{ display:inline-block; }
+#s-foyer .sub{ font-size:10px; letter-spacing:.3em; text-transform:uppercase; color:var(--ink-soft); }
+#s-foyer .statement{
+  font-family:'Newsreader',serif; font-size:19px; line-height:1.7;
+  max-width:52ch; color:var(--ink);
+}
+#s-foyer .scrollcue{ margin-top:2vh; font-size:9px; letter-spacing:.26em;
+  text-transform:uppercase; color:var(--ink-soft); animation:cue 2.4s ease-in-out infinite; }
+@keyframes cue{ 0%,100%{ transform:translateY(0); opacity:.55; } 50%{ transform:translateY(7px); opacity:1; } }
+
+/* empty plinth */
+#s-r8 .vitrine{ background:var(--wall2); display:flex; align-items:center; justify-content:center; }
+#s-r8 .vitrine .reserved{
+  font-family:'Newsreader',serif; font-style:italic; font-size:20px; color:var(--ink-soft);
+}
+
+/* colophon */
+#s-colophon{ flex-direction:column; gap:4vh; text-align:center; }
+#s-colophon .note{
+  font-family:'Newsreader',serif; font-size:16.5px; line-height:1.7;
+  max-width:58ch; color:var(--ink); text-align:left;
+}
+#s-colophon .vitrine{ aspect-ratio:16/7; max-height:44vh; width:min(900px,92vw); background:var(--wall2); }
+#s-colophon h3{ font-family:'Newsreader',serif; font-weight:500; font-size:26px; }
+
+/* rail */
+#rail{ position:fixed; right:18px; top:50%; transform:translateY(-50%);
+  z-index:40; display:flex; flex-direction:column; gap:13px; align-items:center; }
+#rail .dot{ width:9px; height:9px; border-radius:50%;
+  border:1px solid var(--ink-soft); background:transparent; cursor:pointer;
+  transition:background .25s, border-color .25s; }
+#rail .dot.on{ background:var(--red); border-color:var(--red); }
+#rail .dot.empty{ border-style:dashed; }
+#rail #glyph{ width:22px; height:22px; margin-bottom:4px; }
+#rail #glyph path{ fill:none; stroke:var(--ink); stroke-width:1.4;
+  stroke-linecap:round; stroke-linejoin:round; }
+
+#hud{ position:fixed; left:20px; bottom:16px; z-index:40;
+  font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-soft); }
+#hud b{ color:var(--ink); font-weight:500; }
+
+@media (max-width:860px){
+  .room{ grid-template-columns:1fr; gap:26px; }
+  .caption p{ max-width:none; }
+  .vitrine{ max-height:52vh; }
+  #rail{ right:8px; gap:10px; }
+  .folio{ font-size:54px; }
+}
+@media (prefers-reduced-motion: reduce){
+  #s-foyer .scrollcue{ animation:none; }
+}
+</style>
+</head>
+<body>
+<div id="dust"></div>
+<div id="spacer"></div>
+<div id="world"></div>
+
+<div id="rail">
+  <svg id="glyph" viewBox="0 0 16 16"><path id="glyph-path" d=""/></svg>
+</div>
+<div id="hud"><b id="hud-room">foyer</b> · <span id="hud-fps">60</span> fps</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+(function () {
+'use strict';
+if (!window.gsap) { return; }
+var HAS_ANIME  = !!window.anime;
+var HAS_MATTER = !!window.Matter;
+var HAS_THREE  = !!window.THREE;
+var RM   = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var TAU = Math.PI*2;
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+function lerp(a,b,t){ return a+(b-a)*t; }
+function rand(a,b){ return a+Math.random()*(b-a); }
+
+/* ---------- statechart ---------- */
+function createMachine(cfg){
+  var m = { state: cfg.initial,
+    send: function (evt) {
+      var node = cfg.states[m.state];
+      var target = node.on && node.on[evt];
+      if (!target) return;
+      if (node.exit) node.exit();
+      m.state = target;
+      var next = cfg.states[target];
+      if (next.entry) next.entry();
+    } };
+  var first = cfg.states[cfg.initial];
+  if (first.entry) first.entry();
+  return m;
+}
+
+/* ---------- flubber-style morph ---------- */
+var MORPH = (function () {
+  function resample(pts, M) {
+    var n = pts.length/2, lens=[0], total=0, i;
+    for (i=0;i<n;i++){
+      var x0=pts[i*2], y0=pts[i*2+1];
+      var x1=pts[((i+1)%n)*2], y1=pts[((i+1)%n)*2+1];
+      total += Math.hypot(x1-x0,y1-y0); lens.push(total);
+    }
+    var out=new Float32Array(M*2), seg=0;
+    for (i=0;i<M;i++){
+      var d=(i/M)*total;
+      while (seg<n-1 && lens[seg+1]<d) seg++;
+      var l0=lens[seg], l1=lens[seg+1];
+      var f=l1>l0 ? (d-l0)/(l1-l0) : 0;
+      var a=seg%n, b=(seg+1)%n;
+      out[i*2]  =lerp(pts[a*2],  pts[b*2],  f);
+      out[i*2+1]=lerp(pts[a*2+1],pts[b*2+1],f);
+    }
+    return out;
+  }
+  function mix(a,b,t,out){ for (var i=0;i<a.length;i++) out[i]=a[i]+(b[i]-a[i])*t; return out; }
+  function toPath(pts){
+    var d='', M=pts.length/2;
+    for (var i=0;i<M;i++) d+=(i===0?'M':'L')+pts[i*2].toFixed(2)+' '+pts[i*2+1].toFixed(2);
+    return d+'Z';
+  }
+  return { resample:resample, mix:mix, toPath:toPath };
+})();
+
+/* ---------- registry: the seven rooms ---------- */
+var GLYPHS = {
+  flux:  [8,2, 13,5, 11,13, 5,13, 3,5],
+  sumi:  [3,12, 6,3, 10,12, 13,4, 13,12, 3,12],
+  basin: [2,6, 14,6, 12,13, 4,13],
+  eigen: [8,2, 14,8, 8,14, 2,8],
+  pulp:  [8,2, 13,6, 12,12, 8,14, 4,12, 3,6],
+  shear: [2,5, 14,5, 11,8, 14,11, 2,11, 5,8],
+  tide:  [8,1, 10,6, 15,8, 10,10, 8,15, 6,10, 1,8, 6,6],
+  res:   [3,3, 13,3, 13,13, 3,13],
+  dot:   [8,4, 12,8, 8,12, 4,8]
+};
+var ROOMS = [
+  { id:'flux', num:'I', title:'FLUX', year:'exp.01',
+    medium:'spring lattice · curl noise — 1,200 bodies',
+    caption:'Sprung particles chase formations through curl-noise weather. The instrument that opened the series, distilled to its reflex: a target, a spring, a wind.',
+    hint:'move — the swarm gives way', accent:'#ffb454', bg:'#0a090e' },
+  { id:'sumi', num:'II', title:'SUMI', year:'exp.02',
+    medium:'flow-field advection — 4,000 grains',
+    caption:'Ink grains ride a divergence-free field; the stroke never stops being a flow. Drawn from the atelier where a quarter-million grains once poured through a scroll.',
+    hint:'drag — load the brush', accent:'#20306e', bg:'#f4efe6' },
+  { id:'basin', num:'III', title:'BASIN', year:'exp.03',
+    medium:'smoothed-particle hydrodynamics · Tait equation of state',
+    caption:'Pressure from density, density from neighbours — water from arithmetic. Four hundred parcels keep the hydrostatic ledger balanced.',
+    hint:'hold — tilt the bench', accent:'#fff3e2', bg:'#1b2aa6' },
+  { id:'eigen', num:'IV', title:'EIGEN', year:'exp.04',
+    medium:'Chladni modes · gradient descent — 3,000 grains',
+    caption:'Grains descend the amplitude of a standing wave and settle where the plate keeps still: the nodal lines. The figure changes; the mathematics of stillness does not.',
+    hint:'tap — change the mode', accent:'#cdb4e8', bg:'#0d1f1a' },
+  { id:'pulp', num:'V', title:'PULP', year:'exp.05',
+    medium:'XPBD · pressure by area constraint',
+    caption:'A soft body holding its area by constraint projection; squeeze it and it argues back. The drum reduced to one stubborn, breathing cell.',
+    hint:'grab — then let go', accent:'#ff5c49', bg:'#241017' },
+  { id:'shear', num:'VI', title:'SHEAR', year:'exp.06',
+    medium:'Eulerian projection · 96 × 64 · Jacobi ×12',
+    caption:'A pocket Navier–Stokes tunnel: the cylinder writes a Kármán street into smoke. The very kernels that validated the full tunnel, promoted to the plinth.',
+    hint:'drag the cylinder — stir the wake', accent:'#e8491f', bg:'#c9ced4' },
+  { id:'tide', num:'VII', title:'TIDE', year:'exp.07',
+    medium:'direct N-body · symplectic leapfrog — 880 bodies',
+    caption:'Every body pulls on every other; the leapfrog keeps the energy honest. A galaxy the size of a postcard, conserving what the full atlas conserved.',
+    hint:'drag — sling a cluster', accent:'#c9a24d', bg:'#0a1120' }
+];
+
+/* ---------- build the DOM ---------- */
+var world = document.getElementById('world');
+function h(html){ var d=document.createElement('div'); d.innerHTML=html; return d.firstElementChild; }
+
+world.appendChild(h(
+  '<section id="s-foyer">'+
+    '<h1 id="foyer-word"><span>S</span><span>A</span><span>L</span><span>O</span><span>N</span></h1>'+
+    '<div class="sub">seven studies in particulate matter · exp.08</div>'+
+    '<p class="statement">Between one prompt and the next, seven systems: springs, ink, water, resonance, pulp, wind and gravity. The brief never changed; the physics never repeated. They hang here together for the first time — each vitrine live, each one re-deriving its original.</p>'+
+    '<div class="scrollcue">scroll — enter the salon ↓</div>'+
+  '</section>'));
+
+ROOMS.forEach(function(r){
+  world.appendChild(h(
+    '<section id="s-'+r.id+'">'+
+      '<div class="folio">'+r.num+'</div>'+
+      '<div class="room">'+
+        '<div class="caption">'+
+          '<h2>'+r.title+'<i>'+r.year+'</i></h2>'+
+          '<div class="medium">'+r.medium+'</div>'+
+          '<p>'+r.caption+'</p>'+
+          '<div class="hintline">'+r.hint+'</div>'+
+        '</div>'+
+        '<div class="vitrine" id="v-'+r.id+'"><canvas></canvas>'+
+          '<div class="plate">'+r.title.toLowerCase()+' · '+r.year+' · live</div></div>'+
+      '</div>'+
+    '</section>'));
+});
+
+world.appendChild(h(
+  '<section id="s-r8">'+
+    '<div class="folio">VIII</div>'+
+    '<div class="room">'+
+      '<div class="caption">'+
+        '<h2>—<i>reserved</i></h2>'+
+        '<div class="medium">the microphone study</div>'+
+        '<p>An eighth room was drawn for a system that listens. The sandbox that hosts this salon seldom grants the microphone, and a study that cannot open its ears would be a forgery. The plinth waits.</p>'+
+      '</div>'+
+      '<div class="vitrine"><div class="reserved">on loan from the future</div></div>'+
+    '</div>'+
+  '</section>'));
+
+world.appendChild(h(
+  '<section id="s-colophon">'+
+    '<h3>Colophon</h3>'+
+    '<div class="vitrine" id="v-colophon"><canvas></canvas>'+
+      '<div class="plate">the studies, as objects — strike them</div></div>'+
+    '<p class="note">Set in Newsreader and Chivo Mono on a gallery wall. three.js hangs the dust, GSAP moves the rooms, anime.js raised the title, matter.js governs the tokens above. The flubber-style glyph morphs, the nine-state scroll machine, the lenis-style easing of this very page and the spring in every dot are faithful inline implementations. Each room re-derives its original’s physics at miniature scale and was validated headlessly against the same laws; the full instruments remain the seven prior works.</p>'+
+  '</section>'));
+
+/* ==================================================================
+   ROOM MODULES — common shape:
+   make(cv, accent, bg) → { frame(dt,t), setActive(on),
+                            ptr(type,x,y,dx,dy), __t (test hooks) }
+   Physics kept in pure step functions; draw separated.
+   ================================================================== */
+function fitCanvas(cv){
+  var DPR = Math.min(window.devicePixelRatio||1, 2);
+  var r = cv.parentElement.getBoundingClientRect();
+  cv.width = Math.max(2, Math.round(r.width*DPR));
+  cv.height = Math.max(2, Math.round(r.height*DPR));
+  return DPR;
+}
+
+/* ---------- I · FLUX — springs toward morphing formations ---------- */
+function makeFlux(cv, accent, bg){
+  var ctx = cv.getContext('2d');
+  var N = 1200, W=2, H=2;
+  var px=new Float32Array(N), py=new Float32Array(N),
+      vx=new Float32Array(N), vy=new Float32Array(N),
+      tx=new Float32Array(N), ty=new Float32Array(N),
+      ta=new Float32Array(N), tb=new Float32Array(N);
+  var form = 0, blend = 1, mx=-1, my=-1;
+  function formation(f, i, out){
+    var u = i/N;
+    if (f===0){ var a=u*TAU*3; var r0=0.22+0.14*Math.sin(u*TAU*7);
+      out[0]=0.5+Math.cos(a)*r0; out[1]=0.5+Math.sin(a)*r0*0.78; }
+    else if (f===1){ var a2=u*TAU;
+      out[0]=0.5+0.34*Math.sin(2*a2+1.2); out[1]=0.5+0.30*Math.sin(3*a2); }
+    else { var g=Math.floor(u*N); var ang=g*2.39996; var rr=0.36*Math.sqrt(u);
+      out[0]=0.5+Math.cos(ang)*rr; out[1]=0.5+Math.sin(ang)*rr*0.86; }
+  }
+  var tmp=[0,0];
+  function retarget(){
+    for (var i=0;i<N;i++){
+      ta[i]=tx[i]; tb[i]=ty[i];
+      formation(form, i, tmp); tx[i]=tmp[0]; ty[i]=tmp[1];
+    }
+    blend = 0;
+  }
+  for (var i=0;i<N;i++){
+    formation(0,i,tmp); tx[i]=tmp[0]; ty[i]=tmp[1];
+    px[i]=Math.random(); py[i]=Math.random(); ta[i]=tx[i]; tb[i]=ty[i];
+  }
+  function curl(x,y,t){
+    var e=0.02;
+    function n(a,b){ return Math.sin(a*5.1+t*0.5)*Math.cos(b*4.3-t*0.37)
+      + 0.5*Math.sin(a*11.7-t*0.23)*Math.cos(b*9.1+t*0.4); }
+    var dx=(n(x,y+e)-n(x,y-e))/(2*e), dy=(n(x+e,y)-n(x-e,y))/(2*e);
+    return [dx, -dy];
+  }
+  var acc=0, formT=0;
+  function step(dt,t){
+    formT += dt;
+    if (formT > 6){ formT = 0; form=(form+1)%3; retarget(); }
+    blend = Math.min(1, blend + dt/1.4);
+    var k=26, damp=4.4, w=0.05;
+    for (var i=0;i<N;i++){
+      var gx = lerp(ta[i], tx[i], blend), gy = lerp(tb[i], ty[i], blend);
+      var c = curl(px[i], py[i], t);
+      var fx = (gx-px[i])*k - vx[i]*damp + c[0]*w;
+      var fy = (gy-py[i])*k - vy[i]*damp + c[1]*w;
+      if (mx>=0){
+        var dx=px[i]-mx, dy=py[i]-my, d2=dx*dx+dy*dy;
+        if (d2<0.03){ var inv=1/Math.sqrt(d2+1e-5); fx+=dx*inv*0.9; fy+=dy*inv*0.9; }
+      }
+      vx[i]+=fx*dt; vy[i]+=fy*dt;
+      px[i]+=vx[i]*dt; py[i]+=vy[i]*dt;
+    }
+  }
+  function draw(){
+    ctx.fillStyle=bg; ctx.fillRect(0,0,cv.width,cv.height);
+    ctx.globalCompositeOperation='lighter';
+    ctx.fillStyle=accent;
+    var s=cv.width, sy=cv.height;
+    for (var i=0;i<N;i++){
+      var sp=Math.hypot(vx[i],vy[i]);
+      ctx.globalAlpha=clamp(0.24+sp*0.9,0.24,0.85);
+      ctx.fillRect(px[i]*s-1, py[i]*sy-1, 2.2, 2.2);
+    }
+    ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
+  }
+  return {
+    frame:function(dt,t){ step(dt,t); draw(); },
+    setActive:function(){}, 
+    ptr:function(type,x,y){ if(type==='move'||type==='down'){mx=x;my=y;} if(type==='up'){mx=-1;my=-1;} },
+    __t:{ step:step, px:px, py:py, tx:tx, ty:ty, N:N, retarget:retarget,
+          setForm:function(f){form=f;retarget();blend=1;} }
+  };
+}
+
+/* ---------- II · SUMI — grains in a curl-noise field ---------- */
+function makeSumi(cv, accent, bg){
+  var ctx = cv.getContext('2d');
+  var N = 4000;
+  var px=new Float32Array(N), py=new Float32Array(N), age=new Float32Array(N);
+  for (var i=0;i<N;i++){ px[i]=Math.random(); py[i]=Math.random(); age[i]=Math.random()*8; }
+  var vort=[];  /* pointer vortices: {x,y,s,life} */
+  function field(x,y,t){
+    var e=0.02;
+    function n(a,b){ return Math.sin(a*4.2+t*0.21)*Math.cos(b*3.6-t*0.17)
+      + 0.55*Math.sin(a*9.3+b*2.1-t*0.11); }
+    var u=(n(x,y+e)-n(x,y-e))/(2*e), v=-(n(x+e,y)-n(x-e,y))/(2*e);
+    for (var k2=0;k2<vort.length;k2++){
+      var vv=vort[k2], dx=x-vv.x, dy=y-vv.y, d2=dx*dx+dy*dy+0.002;
+      u += -dy/d2*vv.s*0.012; v += dx/d2*vv.s*0.012;
+    }
+    return [u,v];
+  }
+  function step(dt,t){
+    for (var k2=vort.length-1;k2>=0;k2--){ vort[k2].life-=dt; if(vort[k2].life<=0) vort.splice(k2,1); }
+    for (var i=0;i<N;i++){
+      var f=field(px[i],py[i],t);
+      px[i]+=f[0]*dt*0.06; py[i]+=f[1]*dt*0.06;
+      age[i]+=dt;
+      if (px[i]<0||px[i]>1||py[i]<0||py[i]>1||age[i]>9){
+        px[i]=Math.random(); py[i]=Math.random(); age[i]=0;
+      }
+    }
+  }
+  var inited=false;
+  function draw(){
+    if (!inited){ ctx.fillStyle=bg; ctx.fillRect(0,0,cv.width,cv.height); inited=true; }
+    ctx.fillStyle='rgba(244,239,230,0.055)';
+    ctx.fillRect(0,0,cv.width,cv.height);
+    ctx.fillStyle=accent;
+    var s=cv.width, sy=cv.height;
+    for (var i=0;i<N;i++){
+      ctx.globalAlpha = 0.16*(1-age[i]/9)+0.04;
+      ctx.fillRect(px[i]*s, py[i]*sy, 1.4, 1.4);
+    }
+    ctx.globalAlpha=1;
+  }
+  return {
+    frame:function(dt,t){ step(dt,t); draw(); },
+    setActive:function(on){ if(on) inited=false; },
+    ptr:function(type,x,y,dx,dy){
+      if (type==='drag'){ vort.push({x:x,y:y,s:clamp((dx+dy)*40,-3,3)||1.5,life:1.4});
+        for (var k2=0;k2<26;k2++){ var j=(Math.random()*N)|0;
+          px[j]=x+rand(-0.02,0.02); py[j]=y+rand(-0.02,0.02); age[j]=0; } }
+    },
+    __t:{ step:step, px:px, py:py, field:field, N:N }
+  };
+}
+
+/* ---------- IV · EIGEN — grains onto nodal lines ---------- */
+function makeEigen(cv, accent, bg){
+  var ctx = cv.getContext('2d');
+  var N = 3000;
+  var px=new Float32Array(N), py=new Float32Array(N);
+  for (var i=0;i<N;i++){ px[i]=Math.random(); py[i]=Math.random(); }
+  var MODES=[[3,2],[4,3],[2,5],[5,4]];
+  var mi=0, prev=0, xf=1;
+  function psi(m,n,x,y){ return Math.cos(m*Math.PI*x)*Math.cos(n*Math.PI*y); }
+  function amp(x,y){
+    var a=Math.abs(psi(MODES[mi][0],MODES[mi][1],x,y));
+    if (xf<1){ var b=Math.abs(psi(MODES[prev][0],MODES[prev][1],x,y)); return lerp(b,a,xf); }
+    return a;
+  }
+  function step(dt){
+    xf = Math.min(1, xf + dt/1.1);
+    var e=0.004, k=0.09, jit=0.0016;
+    for (var i=0;i<N;i++){
+      var gx=(amp(px[i]+e,py[i])-amp(px[i]-e,py[i]))/(2*e);
+      var gy=(amp(px[i],py[i]+e)-amp(px[i],py[i]-e))/(2*e);
+      px[i]-=gx*k*dt*Math.min(1,amp(px[i],py[i])*3+0.2);
+      py[i]-=gy*k*dt*Math.min(1,amp(px[i],py[i])*3+0.2);
+      px[i]+=rand(-jit,jit); py[i]+=rand(-jit,jit);
+      px[i]=clamp(px[i],0.004,0.996); py[i]=clamp(py[i],0.004,0.996);
+    }
+  }
+  function cycle(){ prev=mi; mi=(mi+1)%MODES.length; xf=0; }
+  var autoT=0;
+  function draw(){
+    ctx.fillStyle=bg; ctx.fillRect(0,0,cv.width,cv.height);
+    ctx.fillStyle=accent;
+    var s=cv.width, sy=cv.height;
+    for (var i=0;i<N;i++){
+      ctx.globalAlpha=0.5;
+      ctx.fillRect(px[i]*s, py[i]*sy, 1.5, 1.5);
+    }
+    ctx.globalAlpha=1;
+  }
+  return {
+    frame:function(dt){ autoT+=dt; if(autoT>7){autoT=0;cycle();} step(dt); draw(); },
+    setActive:function(){},
+    ptr:function(type){ if(type==='down'){ cycle(); autoT=0; } },
+    __t:{ step:step, px:px, py:py, amp:amp, cycle:cycle, N:N,
+          setMode:function(m){mi=m;prev=m;xf=1;} }
+  };
+}
+
+/* ---------- III · BASIN — miniature SPH with Tait EOS ---------- */
+function makeBasin(cv, accent, bg){
+  var ctx = cv.getContext('2d');
+  var N = 420, Hh = 0.052, H2 = Hh*Hh;
+  var px=new Float32Array(N), py=new Float32Array(N),
+      vx=new Float32Array(N), vy=new Float32Array(N),
+      rho=new Float32Array(N), P=new Float32Array(N);
+  /* seed a resting block */
+  var cols=21, s0=Hh*0.55;
+  for (var i=0;i<N;i++){
+    px[i]=0.20+ (i%cols)*s0 + rand(-0.002,0.002);
+    py[i]=0.97- Math.floor(i/cols)*s0;
+  }
+  var MASS=1, RHO0=1, B=6.0, GAMMA=7, XSPH=0.08, GRAV=1.05;
+  var POLY6=4/(Math.PI*Math.pow(Hh,8));       /* 2D poly6 normalization */
+  var SPIKY=30/(Math.PI*Math.pow(Hh,5));      /* 2D spiky gradient coeff */
+  var gx=0, gy=GRAV;
+  /* spatial hash */
+  var CELL=Hh, gw=Math.ceil(1/CELL)+2, heads=new Int32Array(gw*gw), nxt=new Int32Array(N);
+  function buildGrid(){
+    heads.fill(-1);
+    for (var i=0;i<N;i++){
+      var cx2=clamp((px[i]/CELL)|0,0,gw-1), cy2=clamp((py[i]/CELL)|0,0,gw-1);
+      var c=cy2*gw+cx2; nxt[i]=heads[c]; heads[c]=i;
+    }
+  }
+  function poly6(r2){ var d=H2-r2; return d>0 ? POLY6*d*d*d : 0; }
+  function spikyGrad(r){ var d=Hh-r; return d>0 ? SPIKY*d*d : 0; }
+  function forEachNb(i, fn){
+    var cx2=clamp((px[i]/CELL)|0,0,gw-1), cy2=clamp((py[i]/CELL)|0,0,gw-1);
+    for (var oy=-1;oy<=1;oy++)for (var ox=-1;ox<=1;ox++){
+      var xx=cx2+ox, yy=cy2+oy;
+      if (xx<0||yy<0||xx>=gw||yy>=gw) continue;
+      var j=heads[yy*gw+xx];
+      while (j>=0){ fn(j); j=nxt[j]; }
+    }
+  }
+  function computeDensity(){
+    for (var i=0;i<N;i++){
+      var d=0, xi=px[i], yi=py[i];
+      forEachNb(i, function(j){
+        var dx=xi-px[j], dy=yi-py[j], r2=dx*dx+dy*dy;
+        if (r2<H2) d+=MASS*poly6(r2);
+      });
+      rho[i]=d;
+    }
+  }
+  buildGrid(); computeDensity();
+  var rawR=0;
+  for (i=0;i<N;i++) rawR+=rho[i];
+  rawR/=N;
+  MASS = 1/rawR;                 /* choose mass so rest density ≡ 1 */
+  computeDensity();
+  RHO0=1;
+  function step(dt){
+    buildGrid();
+    computeDensity();
+    for (var i=0;i<N;i++){
+      var q=Math.max(rho[i]/RHO0, 0.6);
+      P[i]=Math.max(0, B*(Math.pow(q,GAMMA)-1));   /* no tension: free surface */
+    }
+    for (i=0;i<N;i++){
+      var fx=gx, fy=gy, xi=px[i], yi=py[i];
+      var xvx=0, xvy=0, xw=0;
+      forEachNb(i, function(j){
+        if (j===i) return;
+        var dx=xi-px[j], dy=yi-py[j], r2=dx*dx+dy*dy;
+        if (r2>=H2||r2<1e-10) return;
+        var r=Math.sqrt(r2), g=spikyGrad(r);
+        var common= MASS*(P[i]+P[j])*0.5*g;   /* repulsive: g is |dW/dr|, sign folded in */
+        fx+=common*dx/r; fy+=common*dy/r;
+        var w=poly6(r2)*MASS;
+        xvx+=(vx[j]-vx[i])*w; xvy+=(vy[j]-vy[i])*w; xw+=w;
+      });
+      vx[i]+=fx*dt; vy[i]+=fy*dt;
+      if (xw>0){ vx[i]+=XSPH*xvx; vy[i]+=XSPH*xvy; }   /* XSPH smoothing */
+    }
+    for (i=0;i<N;i++){
+      px[i]+=vx[i]*dt; py[i]+=vy[i]*dt;
+      var m=0.035, damp=-0.35;
+      if (px[i]<m){ px[i]=m; vx[i]*=damp; }
+      if (px[i]>1-m){ px[i]=1-m; vx[i]*=damp; }
+      if (py[i]<m){ py[i]=m; vy[i]*=damp; }
+      if (py[i]>1-m){ py[i]=1-m; vy[i]*=damp; }
+      vx[i]=clamp(vx[i],-1.4,1.4); vy[i]=clamp(vy[i],-1.4,1.4);
+    }
+  }
+  function draw(){
+    ctx.fillStyle=bg; ctx.fillRect(0,0,cv.width,cv.height);
+    var s=cv.width, sy=cv.height, rr=Math.max(2, s*0.0075);
+    ctx.fillStyle=accent;
+    for (var i=0;i<N;i++){
+      ctx.globalAlpha = clamp(0.55 + (rho[i]/RHO0-1)*0.8, 0.35, 0.95);
+      ctx.beginPath(); ctx.arc(px[i]*s, py[i]*sy, rr, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+  var hold=null;
+  return {
+    frame:function(dt){
+      if (hold){ gx=(hold.x-0.5)*2.4; gy=(hold.y-0.5)*2.4+0.3; }
+      else { gx=0; gy=GRAV; }
+      var sub=8;                       /* WCSPH acoustic CFL: h ≈ 0.25·h_s/c_s */
+      for (var s2=0;s2<sub;s2++) step(Math.min(dt,0.033)/sub);
+      draw();
+    },
+    setActive:function(){},
+    ptr:function(type,x,y){
+      if (type==='down'||type==='drag') hold={x:x,y:y};
+      if (type==='up') hold=null;
+    },
+    __t:{ step:step, px:px, py:py, vx:vx, vy:vy, rho:rho, N:N,
+          get RHO0(){ return RHO0; } }
+  };
+}
+
+/* ---------- V · PULP — one pressurized XPBD cell ---------- */
+function makePulp(cv, accent, bg){
+  var ctx = cv.getContext('2d');
+  var M = 26, R0 = 0.16;
+  var px=new Float32Array(M), py=new Float32Array(M),
+      ox=new Float32Array(M), oy=new Float32Array(M),
+      vx=new Float32Array(M), vy=new Float32Array(M),
+      rest=new Float32Array(M);
+  var cx0=0.5, cy0=0.34;
+  for (var i=0;i<M;i++){
+    var a=i/M*TAU;
+    px[i]=cx0+Math.cos(a)*R0; py[i]=cy0+Math.sin(a)*R0*0.94;
+  }
+  for (i=0;i<M;i++){
+    var j=(i+1)%M;
+    rest[i]=Math.hypot(px[j]-px[i],py[j]-py[i]);
+  }
+  function area(){
+    var A=0;
+    for (var i=0;i<M;i++){ var j=(i+1)%M; A+=px[i]*py[j]-px[j]*py[i]; }
+    return A*0.5;
+  }
+  var A0=area();
+  var grab=-1, gx2=0, gy2=0;
+  function step(dt){
+    var SUB=5, h=dt/SUB;
+    for (var s2=0;s2<SUB;s2++){
+      for (var i=0;i<M;i++){
+        vy[i]+=1.15*h;
+        ox[i]=px[i]; oy[i]=py[i];
+        px[i]+=vx[i]*h; py[i]+=vy[i]*h;
+      }
+      if (grab>=0){ px[grab]=gx2; py[grab]=gy2; }
+      /* edge distance constraints */
+      for (var it=0;it<3;it++){
+        for (i=0;i<M;i++){
+          var j=(i+1)%M;
+          var dx=px[j]-px[i], dy=py[j]-py[i];
+          var d=Math.hypot(dx,dy)||1e-9;
+          var C=(d-rest[i])/d*0.5*0.9;
+          px[i]+=dx*C; py[i]+=dy*C;
+          px[j]-=dx*C; py[j]-=dy*C;
+        }
+        /* area (pressure) constraint: push along vertex normals */
+        var A=area(), dA=(A0-A);
+        var corr = dA/A0*0.34;
+        for (i=0;i<M;i++){
+          var ip=(i-1+M)%M, inx=(i+1)%M;
+          var nx2=(py[inx]-py[ip]), ny2=-(px[inx]-px[ip]);
+          var nl=Math.hypot(nx2,ny2)||1e-9;
+          px[i]+=nx2/nl*corr*0.04; py[i]+=ny2/nl*corr*0.04;
+        }
+      }
+      if (grab>=0){ px[grab]=gx2; py[grab]=gy2; }
+      var m=0.05;
+      for (i=0;i<M;i++){
+        if (py[i]>1-m){ py[i]=1-m; }
+        if (px[i]<m) px[i]=m;
+        if (px[i]>1-m) px[i]=1-m;
+        if (py[i]<m) py[i]=m;
+        vx[i]=(px[i]-ox[i])/h; vy[i]=(py[i]-oy[i])/h;
+        vx[i]*=0.999; vy[i]*=0.999;
+      }
+    }
+  }
+  function draw(){
+    ctx.fillStyle=bg; ctx.fillRect(0,0,cv.width,cv.height);
+    var s=cv.width, sy=cv.height;
+    var A=area();
+    var strain=clamp(Math.abs(A-A0)/A0*6,0,1);
+    ctx.beginPath();
+    ctx.moveTo(px[0]*s, py[0]*sy);
+    for (var i=1;i<=M;i++){
+      var a2=i%M, b2=(i+1)%M;
+      ctx.quadraticCurveTo(px[a2]*s, py[a2]*sy,
+        (px[a2]+px[b2])/2*s, (py[a2]+py[b2])/2*sy);
+    }
+    ctx.closePath();
+    ctx.fillStyle=accent;
+    ctx.globalAlpha=0.92; ctx.fill(); ctx.globalAlpha=1;
+    ctx.lineWidth=Math.max(2, s*0.004*(1+strain*1.6));
+    ctx.strokeStyle='rgba(255,244,238,'+(0.35+strain*0.6)+')';
+    ctx.stroke();
+  }
+  return {
+    frame:function(dt){ step(Math.min(dt,0.033)); draw(); },
+    setActive:function(){},
+    ptr:function(type,x,y){
+      if (type==='down'){
+        var best=1e9, bi=-1;
+        for (var i=0;i<M;i++){ var d=Math.hypot(px[i]-x,py[i]-y); if(d<best){best=d;bi=i;} }
+        if (best<0.16){ grab=bi; gx2=x; gy2=y; }
+      } else if (type==='drag'&&grab>=0){ gx2=x; gy2=y; }
+      else if (type==='up'){ grab=-1; }
+    },
+    __t:{ step:step, px:px, py:py, area:area, A0:A0, M:M }
+  };
+}
+
+/* ---------- VI · SHEAR — pocket Navier-Stokes (validated twin, promoted) ---------- */
+function makeShear(cv, accent, bg){
+  var ctx = cv.getContext('2d');
+  var W=96, Hh=64, Nn=W*Hh, tx=1/W, ty=1/Hh;
+  var f=function(){ return new Float32Array(Nn); };
+  var u=f(),v=f(),u2=f(),v2=f(),p=f(),p2=f(),div=f(),curlA=f(),
+      dye=f(),dye2=f(),dyeO=f(),dyeO2=f();
+  var wind=40, eps=6, obsX=0.30, obsY=0.5, obsR=6.5*tx, ovx=0, ovy=0;
+  var time=0;
+  function inObs(x,y){ var dx=(x-obsX)*(W/Hh), dy=y-obsY;
+    return Math.hypot(dx,dy) < obsR*(W/Hh) ? 1 : 0; }
+  function bl(a,x,y){
+    var st0=x*W-0.5, st1=y*Hh-0.5;
+    var i0=Math.floor(st0), j0=Math.floor(st1);
+    var fx=st0-i0, fy=st1-j0, i1=i0+1, j1=j0+1;
+    i0=clamp(i0,0,W-1); i1=clamp(i1,0,W-1);
+    j0=clamp(j0,0,Hh-1); j1=clamp(j1,0,Hh-1);
+    var s00=a[j0*W+i0],s10=a[j0*W+i1],s01=a[j1*W+i0],s11=a[j1*W+i1];
+    return (s00*(1-fx)+s10*fx)*(1-fy)+(s01*(1-fx)+s11*fx)*fy;
+  }
+  var cl=function(x,y){ x=clamp(x,0,W-1); y=clamp(y,0,Hh-1); return y*W+x; };
+  function step(dt){
+    var i,x,y;
+    /* advect velocity */
+    for (y=0;y<Hh;y++)for (x=0;x<W;x++){
+      i=y*W+x;
+      var xu=(x+0.5)*tx, yv=(y+0.5)*ty;
+      var ax=bl(u,xu,yv), ay=bl(v,xu,yv);
+      u2[i]=bl(u,xu-ax*dt*tx,yv-ay*dt*ty)*0.9992;
+      v2[i]=bl(v,xu-ax*dt*tx,yv-ay*dt*ty)*0.9992;
+    }
+    var t3=u;u=u2;u2=t3; t3=v;v=v2;v2=t3;
+    /* curl + confinement */
+    for (y=0;y<Hh;y++)for (x=0;x<W;x++){
+      i=y*W+x;
+      curlA[i]=0.5*((v[cl(x+1,y)]-v[cl(x-1,y)])-(u[cl(x,y+1)]-u[cl(x,y-1)]));
+    }
+    for (y=0;y<Hh;y++)for (x=0;x<W;x++){
+      i=y*W+x;
+      var L=Math.abs(curlA[cl(x-1,y)]), R=Math.abs(curlA[cl(x+1,y)]);
+      var B2=Math.abs(curlA[cl(x,y-1)]), T2=Math.abs(curlA[cl(x,y+1)]);
+      var gx=0.5*(R-L), gy=0.5*(T2-B2), gl=Math.hypot(gx,gy)+1e-5;
+      u[i]+=eps*(gy/gl)*curlA[i]*dt;
+      v[i]+=eps*(-gx/gl)*curlA[i]*dt;
+    }
+    /* divergence (obstacle-aware) */
+    for (y=0;y<Hh;y++)for (x=0;x<W;x++){
+      i=y*W+x;
+      var xu2=(x+0.5)*tx, yv2=(y+0.5)*ty;
+      var uL=u[cl(x-1,y)], uR=u[cl(x+1,y)], vB=v[cl(x,y-1)], vT=v[cl(x,y+1)];
+      if (inObs(xu2-tx,yv2)) uL=ovx;
+      if (inObs(xu2+tx,yv2)) uR=ovx;
+      if (inObs(xu2,yv2-ty)) vB=ovy;
+      if (inObs(xu2,yv2+ty)) vT=ovy;
+      if (y===Hh-1) vT=0;
+      if (y===0) vB=0;
+      div[i]=inObs(xu2,yv2)?0:0.5*((uR-uL)+(vT-vB));
+      p[i]=0;
+    }
+    /* Jacobi ×12 (Neumann at edges + obstacle) */
+    for (var k2=0;k2<12;k2++){
+      for (y=0;y<Hh;y++)for (x=0;x<W;x++){
+        i=y*W+x;
+        var pc=p[i];
+        var xu3=(x+0.5)*tx, yv3=(y+0.5)*ty;
+        var pL=(x===0||inObs(xu3-tx,yv3))?pc:p[i-1];
+        var pR=(x===W-1||inObs(xu3+tx,yv3))?pc:p[i+1];
+        var pB=(y===0||inObs(xu3,yv3-ty))?pc:p[i-W];
+        var pT=(y===Hh-1||inObs(xu3,yv3+ty))?pc:p[i+W];
+        p2[i]=(pL+pR+pB+pT-div[i])*0.25;
+      }
+      t3=p;p=p2;p2=t3;
+    }
+    /* gradient subtract */
+    for (y=0;y<Hh;y++)for (x=0;x<W;x++){
+      i=y*W+x;
+      var pc2=p[i];
+      var xu4=(x+0.5)*tx, yv4=(y+0.5)*ty;
+      var pL2=(x===0||inObs(xu4-tx,yv4))?pc2:p[i-1];
+      var pR2=(x===W-1||inObs(xu4+tx,yv4))?pc2:p[i+1];
+      var pB2=(y===0||inObs(xu4,yv4-ty))?pc2:p[i-W];
+      var pT2=(y===Hh-1||inObs(xu4,yv4+ty))?pc2:p[i+W];
+      u[i]-=0.5*(pR2-pL2); v[i]-=0.5*(pT2-pB2);
+    }
+    /* boundaries */
+    for (y=0;y<Hh;y++)for (x=0;x<W;x++){
+      i=y*W+x;
+      var xu5=(x+0.5)*tx, yv5=(y+0.5)*ty;
+      if (inObs(xu5,yv5)){ u[i]=ovx; v[i]=ovy; }
+      if (xu5<0.012){ u[i]=wind; v[i]=wind*0.03*Math.sin(yv5*44+time*3.1); }
+      if (y===0||y===Hh-1) v[i]=0;
+    }
+    /* dye advect + inlet filament */
+    for (y=0;y<Hh;y++)for (x=0;x<W;x++){
+      i=y*W+x;
+      var xu6=(x+0.5)*tx, yv6=(y+0.5)*ty;
+      var ax2=bl(u,xu6,yv6), ay2=bl(v,xu6,yv6);
+      dye2[i]=bl(dye,xu6-ax2*dt*tx,yv6-ay2*dt*ty)*0.985;
+      dyeO2[i]=bl(dyeO,xu6-ax2*dt*tx,yv6-ay2*dt*ty)*0.982;
+      if (inObs(xu6,yv6)){ dye2[i]*=0.7; dyeO2[i]*=0.7; }
+    }
+    t3=dye;dye=dye2;dye2=t3; t3=dyeO;dyeO=dyeO2;dyeO2=t3;
+    var fy2=0.5+0.4*Math.sin(time*0.9)*Math.sin(time*0.23+1.7);
+    var fi=cl(1,(fy2*Hh)|0);
+    dye[fi]=Math.min(dye[fi]+0.9,2.2);
+    time+=dt;
+  }
+  /* tracers */
+  var TN=1400, tpx=new Float32Array(TN), tpy=new Float32Array(TN);
+  for (var q=0;q<TN;q++){ tpx[q]=Math.random(); tpy[q]=Math.random(); }
+  var img=document.createElement('canvas'); img.width=W; img.height=Hh;
+  var ictx=img.getContext('2d'), idata=ictx.createImageData(W,Hh);
+  function draw(){
+    var d=idata.data;
+    /* zinc field + graphite smoke + orange dye + schlieren edge */
+    for (var y=0;y<Hh;y++)for (var x=0;x<W;x++){
+      var i=y*W+x;
+      var base=211-(y/Hh)*18;
+      var sm=1-Math.exp(-dye[i]*1.5);
+      var ok=1-Math.exp(-dyeO[i]*2.2);
+      var gxx=(dye[cl(x+1,y)]+dyeO[cl(x+1,y)])-(dye[cl(x-1,y)]+dyeO[cl(x-1,y)]);
+      var gyy=(dye[cl(x,y+1)]+dyeO[cl(x,y+1)])-(dye[cl(x,y-1)]+dyeO[cl(x,y-1)]);
+      var edge=clamp(Math.hypot(gxx,gyy)*2.2,0,1)*clamp(gxx*2,0,1);
+      var r=base, g=base+3, b=base+7;
+      r=lerp(r,24,sm*0.85); g=lerp(g,27,sm*0.85); b=lerp(b,32,sm*0.85);
+      r=lerp(r,232,ok); g=lerp(g,73,ok); b=lerp(b,31,ok);
+      r+=edge*44; g+=edge*44; b+=edge*44;
+      var o=i*4;
+      d[o]=r; d[o+1]=g; d[o+2]=b; d[o+3]=255;
+    }
+    ictx.putImageData(idata,0,0);
+    ctx.imageSmoothingEnabled=true;
+    ctx.drawImage(img,0,0,cv.width,cv.height);
+    /* tracer streaks */
+    ctx.strokeStyle='rgba(24,27,32,0.5)';
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    for (var q2=0;q2<TN;q2++){
+      var ux=bl(u,tpx[q2],tpy[q2]), uy=bl(v,tpx[q2],tpy[q2]);
+      tpx[q2]+=ux*(1/60)*tx; tpy[q2]+=uy*(1/60)*ty;
+      if (tpx[q2]>0.995||tpx[q2]<0||tpy[q2]<0||tpy[q2]>1||inObs(tpx[q2],tpy[q2])){
+        tpx[q2]=Math.random()*0.03+0.004; tpy[q2]=Math.random(); continue;
+      }
+      var sx0=tpx[q2]*cv.width, sy0=tpy[q2]*cv.height;
+      ctx.moveTo(sx0,sy0);
+      ctx.lineTo(sx0-ux*0.09*cv.width*tx*8, sy0-uy*0.09*cv.height*ty*8);
+    }
+    ctx.stroke();
+    /* cylinder dial */
+    var pxc=obsX*cv.width, pyc=obsY*cv.height, pr=obsR*cv.width;
+    ctx.fillStyle='#181b20';
+    ctx.beginPath(); ctx.arc(pxc,pyc,pr,0,TAU); ctx.fill();
+    ctx.strokeStyle='rgba(246,249,252,.85)'; ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.arc(pxc,pyc,pr-2,0,TAU); ctx.stroke();
+    ctx.strokeStyle=accent; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(pxc+pr*0.4,pyc); ctx.lineTo(pxc+pr*0.8,pyc); ctx.stroke();
+  }
+  var lastPx=obsX, lastPy=obsY;
+  return {
+    frame:function(dt){
+      ovx=(obsX-lastPx)/Math.max(dt,1e-3)/tx*0.5;
+      ovy=(obsY-lastPy)/Math.max(dt,1e-3)/ty*0.5;
+      ovx=clamp(ovx,-120,120); ovy=clamp(ovy,-120,120);
+      lastPx=obsX; lastPy=obsY;
+      step(Math.min(dt,0.033));
+      draw();
+    },
+    setActive:function(){},
+    ptr:function(type,x,y){
+      if (type==='down'||type==='drag'){
+        var dx=(x-obsX)*(W/Hh), dy=y-obsY;
+        if (type==='drag' || Math.hypot(dx,dy)<obsR*(W/Hh)*2.4){ obsX=clamp(x,0.08,0.92); obsY=clamp(y,0.1,0.9); }
+        else { var i2=cl((x*W)|0,(y*Hh)|0); dyeO[i2]=Math.min(dyeO[i2]+1.4,2.5); }
+      }
+    },
+    __t:{ step:step, u:u, v:v, div:div, p:p, dye:dye, W:W, H:Hh,
+          get uArr(){return u;}, get vArr(){return v;},
+          inObs:inObs, setWind:function(w){wind=w;},
+          probe:function(x,y){ return [bl(u,x,y), bl(v,x,y)]; },
+          setObs:function(x,y){obsX=x;obsY=y;lastPx=x;lastPy=y;} }
+  };
+}
+
+/* ---------- VII · TIDE — direct N-body, symplectic leapfrog ---------- */
+function makeTide(cv, accent, bg){
+  var ctx = cv.getContext('2d');
+  var NMAX=1400, n=0;
+  var px=new Float64Array(NMAX), py=new Float64Array(NMAX),
+      vx=new Float64Array(NMAX), vy=new Float64Array(NMAX),
+      ax=new Float64Array(NMAX), ay=new Float64Array(NMAX),
+      m=new Float64Array(NMAX), alive=new Uint8Array(NMAX);
+  var G=0.55, EPS2=0.0016, potSum=0, primed=false;
+  function add(x,y,vx0,vy0,mm){
+    if (n>=NMAX) return -1;
+    var i=n++;
+    px[i]=x;py[i]=y;vx[i]=vx0;vy[i]=vy0;m[i]=mm;alive[i]=1;
+    return i;
+  }
+  function seedDisc(){
+    n=0; primed=false;
+    var Mn=880*1.3*0.001;
+    add(0.5,0.5,0,0,Mn);
+    var radii=[];
+    for (var i=0;i<880;i++){
+      var r;
+      do { r=-0.085*Math.log(1-Math.random()); } while (r>0.28||r<0.028);
+      radii.push(r);
+    }
+    radii.sort(function(a,b){return a-b;});
+    var enc=Mn;
+    for (i=0;i<880;i++){
+      var r2=radii[i]; enc+=0.001;
+      var th=Math.random()*TAU;
+      var vc=Math.sqrt(G*enc*r2*r2/Math.pow(r2*r2+EPS2,1.5));
+      var sg=vc*0.05;
+      add(0.5+r2*Math.cos(th), 0.5+r2*Math.sin(th),
+          -Math.sin(th)*(vc+rand(-sg,sg)), Math.cos(th)*(vc+rand(-sg,sg)), 0.001);
+    }
+  }
+  seedDisc();
+  function forces(){
+    potSum=0;
+    for (var i=0;i<n;i++){ ax[i]=0; ay[i]=0; }
+    for (i=0;i<n;i++){
+      if (!alive[i]) continue;
+      for (var j=i+1;j<n;j++){
+        if (!alive[j]) continue;
+        var dx=px[j]-px[i], dy=py[j]-py[i];
+        var dr2=dx*dx+dy*dy+EPS2;
+        var inv=1/Math.sqrt(dr2), inv3=inv*inv*inv;
+        var fi=G*m[j]*inv3, fj=G*m[i]*inv3;
+        ax[i]+=fi*dx; ay[i]+=fi*dy;
+        ax[j]-=fj*dx; ay[j]-=fj*dy;
+        potSum-=G*m[i]*m[j]*inv;
+      }
+    }
+  }
+  function step(dt){
+    if (!primed){ forces(); primed=true; }
+    var i;
+    for (i=0;i<n;i++){ if(!alive[i])continue; vx[i]+=ax[i]*dt*0.5; vy[i]+=ay[i]*dt*0.5; }
+    for (i=0;i<n;i++){ if(!alive[i])continue; px[i]+=vx[i]*dt; py[i]+=vy[i]*dt; }
+    forces();
+    for (i=0;i<n;i++){ if(!alive[i])continue; vx[i]+=ax[i]*dt*0.5; vy[i]+=ay[i]*dt*0.5; }
+    for (i=1;i<n;i++){
+      var dx=px[i]-0.5, dy=py[i]-0.5;
+      if (dx*dx+dy*dy>1.4) alive[i]=0;
+    }
+  }
+  function measure(){
+    var ke=0, Lz=0, cmx=0, cmy=0, Mt=0;
+    for (var i=0;i<n;i++){ if(!alive[i])continue;
+      Mt+=m[i]; cmx+=m[i]*px[i]; cmy+=m[i]*py[i]; }
+    cmx/=Mt; cmy/=Mt;
+    for (i=0;i<n;i++){ if(!alive[i])continue;
+      ke+=0.5*m[i]*(vx[i]*vx[i]+vy[i]*vy[i]);
+      Lz+=m[i]*((px[i]-cmx)*vy[i]-(py[i]-cmy)*vx[i]); }
+    return { E: ke+potSum, L: Lz };
+  }
+  var inited=false, sling=null;
+  function draw(){
+    if (!inited){ ctx.fillStyle=bg; ctx.fillRect(0,0,cv.width,cv.height); inited=true; }
+    ctx.fillStyle='rgba(10,17,32,0.16)';
+    ctx.fillRect(0,0,cv.width,cv.height);
+    var s=cv.width, sy=cv.height;
+    ctx.fillStyle='#f0e6cf';
+    for (var i=1;i<n;i++){
+      if (!alive[i]) continue;
+      var sp=Math.hypot(vx[i],vy[i]);
+      ctx.globalAlpha=clamp(0.3+sp*1.4,0.3,0.85);
+      ctx.fillRect(px[i]*s, py[i]*sy, 1.6, 1.6);
+    }
+    ctx.globalAlpha=1;
+    ctx.strokeStyle=accent; ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.arc(px[0]*s,py[0]*sy,7,0,TAU); ctx.stroke();
+    ctx.globalAlpha=0.5;
+    ctx.beginPath(); ctx.arc(px[0]*s,py[0]*sy,12,0,TAU); ctx.stroke();
+    ctx.globalAlpha=1;
+    if (sling){
+      ctx.strokeStyle=accent; ctx.setLineDash([4,4]);
+      ctx.beginPath(); ctx.moveTo(sling.x0*s,sling.y0*sy);
+      ctx.lineTo(sling.x1*s,sling.y1*sy); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+  return {
+    frame:function(dt){
+      var h2=Math.min(dt,0.033)/2;
+      step(h2); step(h2);
+      draw();
+    },
+    setActive:function(on){ if(on) inited=false; },
+    ptr:function(type,x,y){
+      if (type==='down') sling={x0:x,y0:y,x1:x,y1:y};
+      else if (type==='drag'&&sling){ sling.x1=x; sling.y1=y; }
+      else if (type==='up'&&sling){
+        var vx0=(sling.x0-sling.x1)*1.6, vy0=(sling.y0-sling.y1)*1.6;
+        for (var k2=0;k2<120;k2++){
+          var a2=Math.random()*TAU, rr=Math.random()*0.03;
+          add(sling.x0+Math.cos(a2)*rr, sling.y0+Math.sin(a2)*rr,
+              vx0+rand(-0.02,0.02), vy0+rand(-0.02,0.02), 0.001);
+        }
+        primed=false; sling=null;
+      }
+    },
+    __t:{ step:step, add:add, measure:measure, seedDisc:seedDisc,
+          px:px, py:py, vx:vx, vy:vy, m:m, alive:alive,
+          get n(){return n;}, reset:function(){n=0;primed=false;},
+          G:G, EPS2:EPS2 }
+  };
+}
+
+/* ---------- registry wiring ---------- */
+var MAKERS = { flux:makeFlux, sumi:makeSumi, basin:makeBasin,
+               eigen:makeEigen, pulp:makePulp, shear:makeShear, tide:makeTide };
+var LIVE = {};
+ROOMS.forEach(function(r){
+  var vit = document.getElementById('v-'+r.id);
+  var cvs = vit.querySelector('canvas');
+  fitCanvas(cvs);
+  LIVE[r.id] = MAKERS[r.id](cvs, r.accent, r.bg);
+  /* pointer plumbing (vitrine-local normalized coords) */
+  var down=false, lx=0, ly=0;
+  function xy(e){ var rc=vit.getBoundingClientRect();
+    return [ (e.clientX-rc.left)/rc.width, (e.clientY-rc.top)/rc.height ]; }
+  vit.addEventListener('pointerdown', function(e){
+    down=true; vit.setPointerCapture(e.pointerId);
+    var p=xy(e); lx=p[0]; ly=p[1];
+    LIVE[r.id].ptr('down', p[0], p[1], 0, 0);
+    e.preventDefault();
+  });
+  vit.addEventListener('pointermove', function(e){
+    var p=xy(e);
+    LIVE[r.id].ptr(down?'drag':'move', p[0], p[1], p[0]-lx, p[1]-ly);
+    lx=p[0]; ly=p[1];
+  });
+  function up(){ if(down){ down=false; LIVE[r.id].ptr('up', lx, ly, 0, 0); } }
+  vit.addEventListener('pointerup', up);
+  vit.addEventListener('pointercancel', up);
+  vit.addEventListener('pointerleave', function(){ LIVE[r.id].ptr('up', lx, ly, 0, 0); down=false; });
+});
+
+/* ---------- lenis-style scroll spine ---------- */
+var SCROLL = (function(){
+  var target=0, smooth=0, worldH=0;
+  var spacer=document.getElementById('spacer');
+  function measureH(){
+    worldH = world.scrollHeight;
+    spacer.style.height = worldH+'px';
+  }
+  measureH();
+  window.addEventListener('scroll', function(){ target = window.scrollY; }, { passive:true });
+  function tick(dt){
+    if (RM){ smooth = target; }
+    else smooth += (target - smooth) * (1 - Math.pow(0.001, dt));
+    world.style.transform = 'translate3d(0,'+(-smooth)+'px,0)';
+    return smooth;
+  }
+  function scrollToSection(idx){
+    var secs = world.children;
+    if (idx<0||idx>=secs.length) return;
+    window.scrollTo({ top: secs[idx].offsetTop, behavior: RM?'auto':'smooth' });
+  }
+  return { tick:tick, measureH:measureH, scrollToSection:scrollToSection,
+           get y(){ return smooth; }, get h(){ return worldH; } };
+})();
+
+/* ---------- scroll statechart: foyer → I..VII → VIII → colophon ---------- */
+var STATES = ['foyer','flux','sumi','basin','eigen','pulp','shear','tide','r8','colophon'];
+var cfgStates = {};
+STATES.forEach(function(s, i){
+  var on = {};
+  STATES.forEach(function(t){ on['GO_'+t.toUpperCase()] = t; });
+  cfgStates[s] = { on: on,
+    entry: function(){
+      document.getElementById('hud-room').textContent =
+        s==='foyer' ? 'foyer' : (s==='r8' ? 'VIII — reserved' :
+        (s==='colophon' ? 'colophon' : s));
+      var ri = ROOMS.findIndex(function(r){ return r.id===s; });
+      setActiveRoom(ri >= 0 ? s : null);
+      updateRail(i);
+      morphRailGlyph(s);
+      if (s==='colophon') COLO.wake();
+    } };
+});
+var machine;   /* created after rail, glyph and colophon are wired */
+
+var activeRoom = null;
+function setActiveRoom(id){
+  if (activeRoom && LIVE[activeRoom]) LIVE[activeRoom].setActive(false);
+  activeRoom = id;
+  if (id && LIVE[id]) LIVE[id].setActive(true);
+}
+
+/* ---------- rail: dots + morphing glyph ---------- */
+var rail = document.getElementById('rail');
+var dots = [];
+STATES.forEach(function(s, i){
+  var d = document.createElement('div');
+  d.className = 'dot' + (s==='r8' ? ' empty' : '');
+  d.addEventListener('click', function(){ SCROLL.scrollToSection(i); springDot(d); });
+  rail.appendChild(d);
+  dots.push(d);
+});
+function updateRail(idx){
+  dots.forEach(function(d,i){ d.classList.toggle('on', i===idx); });
+}
+function springDot(el){
+  if (RM) return;
+  var s={v:0,x:1}, rel=false, last=performance.now();
+  if (el._r) cancelAnimationFrame(el._r);
+  function t2(now){
+    var dt=Math.min((now-last)/1000,0.03); last=now;
+    var goal=rel?1:1.55;
+    s.v+=(-300*(s.x-goal)-15*s.v)*dt; s.x+=s.v*dt;
+    el.style.transform='scale('+s.x.toFixed(3)+')';
+    if (rel&&Math.abs(s.x-1)<0.002&&Math.abs(s.v)<0.02){ el.style.transform=''; el._r=null; return; }
+    el._r=requestAnimationFrame(t2);
+  }
+  el._r=requestAnimationFrame(t2);
+  setTimeout(function(){ rel=true; }, 100);
+}
+var glyphM = 40;
+var glyphShapes = {};
+Object.keys(GLYPHS).forEach(function(k){
+  glyphShapes[k] = MORPH.resample(new Float32Array(GLYPHS[k]), glyphM);
+});
+var glyphCur = glyphShapes.dot.slice(0);
+var glyphEl = document.getElementById('glyph-path');
+glyphEl.setAttribute('d', MORPH.toPath(glyphCur));
+var glyphTween = { t:1 }, glyphFrom = glyphShapes.dot, glyphTo = glyphShapes.dot;
+function morphRailGlyph(state){
+  var key = GLYPHS[state] ? state : (state==='r8' ? 'res' : 'dot');
+  var next = glyphShapes[key];
+  if (RM){ glyphEl.setAttribute('d', MORPH.toPath(next)); glyphCur=next.slice(0); return; }
+  glyphFrom = glyphCur.slice(0); glyphTo = next; glyphTween.t = 0;
+  gsap.killTweensOf(glyphTween);
+  gsap.to(glyphTween, { t:1, duration:0.55, ease:'power2.inOut', onUpdate:function(){
+    MORPH.mix(glyphFrom, glyphTo, glyphTween.t, glyphCur);
+    glyphEl.setAttribute('d', MORPH.toPath(glyphCur));
+  }});
+}
+
+/* ---------- foyer dust (three.js, optional) ---------- */
+var DUST = (function(){
+  if (!HAS_THREE) return { tick:function(){}, resize:function(){} };
+  var renderer, scene, cam, pts, mat;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias:false, alpha:true });
+  } catch(e){ return { tick:function(){}, resize:function(){} }; }
+  renderer.setPixelRatio(1);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.getElementById('dust').appendChild(renderer.domElement);
+  scene = new THREE.Scene();
+  cam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+  var N=1600, geo=new THREE.BufferGeometry();
+  var pos=new Float32Array(N*3), seed=new Float32Array(N);
+  for (var i=0;i<N;i++){
+    pos[i*3]=Math.random()*2-1; pos[i*3+1]=Math.random()*2-1; pos[i*3+2]=0;
+    seed[i]=Math.random()*TAU;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('aSeed', new THREE.BufferAttribute(seed,1));
+  mat = new THREE.ShaderMaterial({
+    vertexShader:[
+      'attribute float aSeed;',
+      'uniform float uT;',
+      'uniform float uScroll;',
+      'void main(){',
+      '  vec3 p = position;',
+      '  p.x += sin(uT*0.11 + aSeed)*0.02;',
+      '  p.y += cos(uT*0.09 + aSeed*1.7)*0.02 + fract(uScroll*0.00013 + aSeed*0.159)*0.0;',
+      '  p.y = mod(p.y + uScroll*0.00016*(0.4+0.6*fract(aSeed)), 2.0) - 1.0;',
+      '  gl_Position = vec4(p, 1.0);',
+      '  gl_PointSize = 1.0 + fract(aSeed*7.13)*1.6;',
+      '}'
+    ].join('\n'),
+    fragmentShader:[
+      'precision mediump float;',
+      'void main(){',
+      '  vec2 c = gl_PointCoord - 0.5;',
+      '  if (dot(c,c) > 0.25) discard;',
+      '  gl_FragColor = vec4(vec3(0.11, 0.10, 0.09), 0.10);',
+      '}'
+    ].join('\n'),
+    uniforms:{ uT:{value:0}, uScroll:{value:0} },
+    transparent:true, depthTest:false, depthWrite:false
+  });
+  pts = new THREE.Points(geo, mat);
+  pts.frustumCulled = false;
+  scene.add(pts);
+  return {
+    tick:function(t, sy){ mat.uniforms.uT.value=t; mat.uniforms.uScroll.value=sy;
+      renderer.render(scene, cam); },
+    resize:function(){ renderer.setSize(window.innerWidth, window.innerHeight); }
+  };
+})();
+
+/* ---------- colophon: the studies as matter.js tokens ---------- */
+var COLO = (function(){
+  var vit = document.getElementById('v-colophon');
+  var cv = vit.querySelector('canvas');
+  var ctx = cv.getContext('2d');
+  fitCanvas(cv);
+  if (!HAS_MATTER) return { wake:function(){}, frame:function(){}, active:false };
+  var Engine=Matter.Engine, Bodies=Matter.Bodies, Body=Matter.Body,
+      Composite=Matter.Composite, Constraint=Matter.Constraint;
+  var engine = Engine.create();
+  engine.gravity.y = 1;
+  var toks = [], walls = [], built=false, holdC=null;
+  function build(){
+    if (built) return; built=true;
+    var w=cv.width, h2=cv.height, r=Math.min(w,h2)*0.075;
+    walls=[ Bodies.rectangle(w/2,h2+28,w*1.3,60,{isStatic:true}),
+            Bodies.rectangle(w/2,-28,w*1.3,60,{isStatic:true}),
+            Bodies.rectangle(-28,h2/2,60,h2*1.3,{isStatic:true}),
+            Bodies.rectangle(w+28,h2/2,60,h2*1.3,{isStatic:true}) ];
+    Composite.add(engine.world, walls);
+    ROOMS.forEach(function(rm,i){
+      var b=Bodies.circle(w*(0.14+i*0.12), h2*0.2+((i%2)*40), r,
+        { restitution:0.55, frictionAir:0.012 });
+      b._room=rm;
+      toks.push(b);
+    });
+    Composite.add(engine.world, toks);
+  }
+  function wake(){ build(); }
+  function frame(dt){
+    if (!built) return;
+    Engine.update(engine, Math.min(dt*1000,33));
+    ctx.fillStyle='#eae6dd'; ctx.fillRect(0,0,cv.width,cv.height);
+    for (var i=0;i<toks.length;i++){
+      var b=toks[i], rm=b._room;
+      ctx.save();
+      ctx.translate(b.position.x, b.position.y);
+      ctx.rotate(b.angle);
+      ctx.beginPath(); ctx.arc(0,0,b.circleRadius,0,TAU);
+      ctx.fillStyle=rm.bg; ctx.fill();
+      ctx.lineWidth=2; ctx.strokeStyle=rm.accent; ctx.stroke();
+      ctx.fillStyle=rm.accent;
+      ctx.font='500 '+(b.circleRadius*0.62)+'px "Chivo Mono"';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(rm.num, 0, 1);
+      ctx.restore();
+    }
+  }
+  var down=false;
+  cv.parentElement.addEventListener('pointerdown', function(e){
+    if (!built) return;
+    var rc=cv.parentElement.getBoundingClientRect();
+    var x=(e.clientX-rc.left)/rc.width*cv.width, y=(e.clientY-rc.top)/rc.height*cv.height;
+    var best=1e9, bi=-1;
+    for (var i=0;i<toks.length;i++){
+      var d=Math.hypot(toks[i].position.x-x, toks[i].position.y-y);
+      if (d<best){ best=d; bi=i; }
+    }
+    if (bi>=0 && best < toks[bi].circleRadius*2.2){
+      holdC = Constraint.create({ body:toks[bi],
+        pointB:{x:x,y:y}, stiffness:0.08, damping:0.12, length:0 });
+      Composite.add(engine.world, holdC);
+      down=true;
+      cv.parentElement.setPointerCapture(e.pointerId);
+    }
+  });
+  cv.parentElement.addEventListener('pointermove', function(e){
+    if (!down||!holdC) return;
+    var rc=cv.parentElement.getBoundingClientRect();
+    holdC.pointB.x=(e.clientX-rc.left)/rc.width*cv.width;
+    holdC.pointB.y=(e.clientY-rc.top)/rc.height*cv.height;
+  });
+  function up(){ if(holdC){ Composite.remove(engine.world, holdC); holdC=null; } down=false; }
+  cv.parentElement.addEventListener('pointerup', up);
+  cv.parentElement.addEventListener('pointercancel', up);
+  return { wake:wake, frame:frame, get active(){ return built; } };
+})();
+
+/* ---------- section tracking / boot / loop ---------- */
+function currentSectionIndex(){
+  var secs = world.children, mid = SCROLL.y + window.innerHeight*0.5;
+  for (var i=0;i<secs.length;i++){
+    var s=secs[i];
+    if (mid >= s.offsetTop && mid < s.offsetTop + s.offsetHeight) return i;
+  }
+  return SCROLL.y < 10 ? 0 : secs.length-1;
+}
+window.addEventListener('keydown', function(e){
+  var k=e.key;
+  var idx=currentSectionIndex();
+  if (k>='1'&&k<='8'){ SCROLL.scrollToSection(parseInt(k,10)); }
+  else if (k==='ArrowDown'||k==='PageDown'){ e.preventDefault(); SCROLL.scrollToSection(idx+1); }
+  else if (k==='ArrowUp'||k==='PageUp'){ e.preventDefault(); SCROLL.scrollToSection(idx-1); }
+});
+window.addEventListener('resize', function(){
+  SCROLL.measureH(); DUST.resize();
+  ROOMS.forEach(function(r){
+    fitCanvas(document.getElementById('v-'+r.id).querySelector('canvas'));
+    if (LIVE[r.id]) LIVE[r.id].setActive(r.id===activeRoom);
+  });
+});
+
+machine = createMachine({ initial:'foyer', states: cfgStates });
+
+if (!RM && HAS_ANIME){
+  anime({ targets:'#foyer-word span', translateY:[-70,0], opacity:[0,1],
+    delay:anime.stagger(70), duration:850, easing:'easeOutElastic(1,.6)' });
+} else if (!RM){
+  gsap.fromTo('#foyer-word span', {y:-70,opacity:0},
+    {y:0,opacity:1,stagger:0.07,duration:0.8,ease:'elastic.out(1,0.6)'});
+}
+
+var lastT = performance.now(), fpsAcc=0, fpsN=0, teleT=0;
+function loop(now){
+  requestAnimationFrame(loop);
+  var dt = Math.min((now-lastT)/1000, 0.05);
+  lastT = now;
+  if (document.hidden) return;
+  var t = now/1000;
+
+  var sy = SCROLL.tick(dt);
+  var idx = currentSectionIndex();
+  var st = STATES[clamp(idx,0,STATES.length-1)];
+  if (st && machine.state !== st) machine.send('GO_'+st.toUpperCase());
+
+  if (activeRoom && LIVE[activeRoom]) LIVE[activeRoom].frame(dt, t);
+  if (machine.state==='colophon') COLO.frame(dt);
+  DUST.tick(t, sy);
+
+  fpsAcc+=1/Math.max(dt,1e-3); fpsN++; teleT+=dt;
+  if (teleT>0.5){
+    document.getElementById('hud-fps').textContent = Math.round(fpsAcc/fpsN);
+    fpsAcc=0; fpsN=0; teleT=0;
+  }
+}
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
