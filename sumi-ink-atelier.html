@@ -1,0 +1,2061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>SUMI · soft-matter atelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+/* ==============================================================
+   SUMI — soft-matter atelier
+   Cold washed paper · blue-black ink · one drop of vermillion.
+   Type: Zen Old Mincho (display + kanji) / Space Mono (utility)
+   The signature is the ink itself: a quarter-million GPU grains
+   you drag around like wet pigment.
+   ============================================================== */
+:root{
+  --paper:#e7ebee;
+  --paper-2:#dde3e7;
+  --ink:#101418;
+  --ink-2:#27364b;
+  --mid:#5c6670;
+  --faint:rgba(16,20,24,.16);
+  --ghost:rgba(16,20,24,.30);
+  --seal:#c63a1e;
+  --disp:'Zen Old Mincho','Hiragino Mincho ProN','Yu Mincho',Georgia,serif;
+  --mono:'Space Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto} }
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--mono);
+  font-size:13px;
+  line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+::selection{background:var(--seal);color:var(--paper)}
+a{color:inherit}
+button{font-family:var(--mono)}
+:focus-visible{outline:2px solid var(--seal);outline-offset:3px}
+body.fine{cursor:none}
+body.fine a,body.fine button{cursor:none}
+
+/* -------- fixed layers -------- */
+#ink{position:fixed;inset:0;z-index:0;display:block;width:100%;height:100%}
+#grain{position:fixed;inset:0;z-index:22;pointer-events:none;opacity:.05;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E")}
+#nogl{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;
+  background:var(--paper);text-align:center;padding:40px;letter-spacing:.12em;line-height:2.4;color:var(--mid)}
+
+/* -------- chrome -------- */
+.chrome{position:fixed;z-index:30;font-size:10px;letter-spacing:.24em;text-transform:uppercase}
+.booting [data-ui]{opacity:0}
+#brand{top:22px;left:24px;display:flex;align-items:flex-start;gap:13px}
+#brand .kanji{font-family:var(--disp);font-weight:900;font-size:34px;line-height:1;color:var(--ink)}
+#brand .stack{display:flex;flex-direction:column;gap:4px;padding-top:3px}
+#brand .word{font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:.5em;color:var(--ink)}
+#brand .sub{color:var(--mid);letter-spacing:.2em}
+#meta{top:26px;right:24px;display:flex;align-items:center;gap:18px;color:var(--mid)}
+#meta .cell b{color:var(--ink);font-weight:700}
+#inkbtn{all:unset;border:1px solid var(--faint);padding:8px 13px;letter-spacing:.22em;
+  text-transform:uppercase;font-size:10px;color:var(--ink);background:rgba(231,235,238,.6);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  transition:background .3s,color .3s,border-color .3s}
+#inkbtn:hover{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+#inkbtn b{color:var(--seal);font-weight:700}
+#inkbtn:hover b{color:var(--paper)}
+
+/* vertical study rail — right edge, sumi tradition */
+#rail{right:20px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:16px;align-items:center}
+#rail a{writing-mode:vertical-rl;text-decoration:none;color:var(--mid);letter-spacing:.34em;
+  font-size:9.5px;display:flex;align-items:center;gap:7px;transition:color .3s}
+#rail a .k{font-family:var(--disp);font-weight:700;font-size:14px;letter-spacing:0}
+#rail a:hover,#rail a.live{color:var(--ink)}
+#rail a.live .k{color:var(--seal)}
+#rail .rule{width:1px;height:34px;background:var(--faint)}
+#status{left:24px;bottom:20px;color:var(--mid);letter-spacing:.22em;display:flex;gap:9px;align-items:center}
+#status .tick{display:inline-block;width:26px;height:1px;background:var(--ink);
+  transform-origin:left;animation:tickpulse 2.2s ease-in-out infinite}
+@keyframes tickpulse{0%,100%{transform:scaleX(.3)}50%{transform:scaleX(1)}}
+
+/* -------- content flow -------- */
+main{position:relative;z-index:10}
+.wrap{max-width:1180px;margin:0 auto;padding:0 clamp(20px,5vw,64px)}
+
+/* hero */
+#hero{height:260vh}
+.hero-pin{height:100vh;height:100svh;display:flex;flex-direction:column;justify-content:flex-end;
+  padding-bottom:9svh;position:relative}
+.hero-eyebrow{display:flex;align-items:center;gap:14px;color:var(--mid);
+  letter-spacing:.3em;text-transform:uppercase;font-size:10px}
+.hero-eyebrow .rule{flex:0 0 64px;height:1px;background:var(--ink)}
+.hero-claim{font-family:var(--disp);font-weight:500;font-size:clamp(21px,3.1vw,34px);
+  line-height:1.5;max-width:21em;margin-top:18px;color:var(--ink)}
+.hero-claim em{font-style:normal;font-weight:900}
+.hero-claim .v{color:var(--seal)}
+.hero-note{margin-top:16px;color:var(--mid);max-width:46ch;font-size:11.5px;letter-spacing:.04em}
+.hero-cue{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--mid);
+  font-size:9.5px;letter-spacing:.34em;text-transform:uppercase}
+.hero-cue .drop{width:1px;height:44px;background:var(--ink);transform-origin:top;
+  animation:cuedrop 1.8s cubic-bezier(.7,0,.2,1) infinite}
+@keyframes cuedrop{0%{transform:scaleY(0)}55%{transform:scaleY(1)}100%{transform:scaleY(1);opacity:0}}
+
+/* marquee */
+#marq{border-top:1px solid var(--faint);border-bottom:1px solid var(--faint);
+  overflow:hidden;padding:15px 0;background:rgba(231,235,238,.4);
+  -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+#marq .track{display:flex;gap:0;white-space:nowrap;will-change:transform}
+#marq .set{display:flex;align-items:baseline;gap:34px;padding-right:34px}
+#marq .w{font-family:var(--disp);font-weight:700;font-size:19px;letter-spacing:.18em}
+#marq .k{font-family:var(--disp);font-weight:900;font-size:15px;color:var(--seal)}
+#marq .dot{width:5px;height:5px;background:var(--ink);border-radius:50%;align-self:center}
+
+/* studies */
+.study{padding:19vh 0 15vh;position:relative}
+.study-head{display:grid;grid-template-columns:auto auto 1fr auto;align-items:baseline;
+  gap:20px;border-bottom:1px solid var(--faint);padding-bottom:16px;margin-bottom:34px}
+.study-head .k{font-family:var(--disp);font-weight:900;font-size:clamp(38px,5vw,58px);line-height:1}
+.study-head h2{font-family:var(--disp);font-weight:900;font-size:clamp(30px,4.4vw,52px);
+  letter-spacing:.1em;line-height:1}
+.study-head .rule{height:1px;background:var(--faint);align-self:center}
+.study-head .no{color:var(--mid);letter-spacing:.3em;font-size:10px}
+.study-copy{max-width:37em;color:var(--ink);font-size:12.5px}
+.study-copy .lead{font-family:var(--disp);font-weight:700;font-size:17px;line-height:1.7;margin-bottom:12px}
+.study-copy p+p{margin-top:10px}
+.study-copy .fn{color:var(--mid);font-size:10.5px;letter-spacing:.06em;margin-top:14px;
+  border-left:2px solid var(--seal);padding-left:12px;line-height:1.9}
+.ghost{position:absolute;z-index:-1;right:-.04em;top:4vh;font-family:var(--disp);font-weight:900;
+  font-size:clamp(110px,21vw,300px);line-height:.8;color:transparent;
+  -webkit-text-stroke:1px var(--ghost);letter-spacing:.02em;mix-blend-mode:multiply;
+  user-select:none;pointer-events:none;white-space:nowrap}
+
+/* frosted lab frames */
+.lab{position:relative;border:1px solid var(--faint);background:rgba(231,235,238,.55);
+  -webkit-backdrop-filter:blur(9px);backdrop-filter:blur(9px);
+  height:min(58vh,560px);min-height:360px;margin-top:34px;overflow:hidden}
+.lab canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:pan-y}
+.lab .corner{position:absolute;width:14px;height:14px;border:1px solid var(--ink);z-index:3;pointer-events:none}
+.lab .corner.tl{top:-1px;left:-1px;border-right:0;border-bottom:0}
+.lab .corner.tr{top:-1px;right:-1px;border-left:0;border-bottom:0}
+.lab .corner.bl{bottom:-1px;left:-1px;border-right:0;border-top:0}
+.lab .corner.br{bottom:-1px;right:-1px;border-left:0;border-top:0}
+.lab .tag{position:absolute;top:12px;left:14px;z-index:3;font-size:9.5px;letter-spacing:.28em;
+  text-transform:uppercase;color:var(--mid);pointer-events:none}
+.lab .tools{position:absolute;bottom:12px;right:12px;z-index:4;display:flex;gap:8px}
+.btn{all:unset;border:1px solid var(--ink);padding:10px 17px;font-size:10px;letter-spacing:.24em;
+  text-transform:uppercase;color:var(--ink);background:rgba(231,235,238,.8);position:relative;
+  transition:background .28s,color .28s,transform .18s}
+.btn:hover{background:var(--ink);color:var(--paper)}
+.btn:active{transform:scale(.95)}
+.btn.seal{border-color:var(--seal);color:var(--seal)}
+.btn.seal:hover{background:var(--seal);color:var(--paper)}
+
+/* elastic type study */
+#eword{font-family:var(--disp);font-weight:900;font-size:clamp(64px,13.5vw,190px);
+  line-height:1.02;letter-spacing:.04em;margin:26px 0 8px;user-select:none;
+  filter:url(#liq);will-change:filter}
+#eword .ch{display:inline-block;will-change:transform}
+.ecap{color:var(--mid);font-size:10px;letter-spacing:.3em;text-transform:uppercase}
+.blotwrap{display:grid;grid-template-columns:minmax(220px,340px) 1fr;gap:40px;
+  align-items:center;margin-top:44px}
+#blot{width:100%;aspect-ratio:1;display:block;touch-action:manipulation}
+#blot path{fill:var(--ink);transition:fill .6s}
+.blotcopy .lead{font-family:var(--disp);font-weight:700;font-size:16px;line-height:1.75}
+#blotname{color:var(--seal);letter-spacing:.3em;text-transform:uppercase;font-size:10px;
+  display:inline-block;margin-top:12px}
+
+/* footer */
+footer{position:relative;z-index:10;padding:22vh 0 12vh;text-align:center}
+footer .kbig{font-family:var(--disp);font-weight:900;font-size:clamp(130px,26vw,340px);
+  line-height:.9;color:transparent;-webkit-text-stroke:1px var(--ghost);mix-blend-mode:multiply;
+  user-select:none}
+#sealbox{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;
+  width:64px;height:64px;background:var(--seal);color:var(--paper);margin:34px auto 22px;
+  font-family:var(--disp);font-weight:900;font-size:26px;line-height:1;gap:2px;
+  box-shadow:0 1px 0 rgba(16,20,24,.2)}
+#sealbox small{font-family:var(--mono);font-size:7.5px;letter-spacing:.3em;font-weight:400}
+.colophon{color:var(--mid);font-size:10.5px;letter-spacing:.14em;line-height:2.2;max-width:52ch;margin:0 auto}
+#top{margin-top:30px;display:inline-block}
+
+/* preloader */
+#veil{position:fixed;inset:0;z-index:70;background:var(--paper);display:flex;
+  align-items:center;justify-content:center}
+#veil svg{width:150px;height:150px;overflow:visible}
+#veil path{fill:var(--ink)}
+#count{position:absolute;right:26px;bottom:18px;font-size:11px;letter-spacing:.3em;color:var(--mid)}
+#vline{position:absolute;left:26px;bottom:22px;font-size:9.5px;letter-spacing:.3em;
+  text-transform:uppercase;color:var(--mid)}
+
+/* cursor */
+#cur,#curdot{position:fixed;top:0;left:0;z-index:60;pointer-events:none;display:none}
+body.fine #cur,body.fine #curdot{display:block}
+#curdot{width:4px;height:4px;margin:-2px 0 0 -2px;background:var(--seal);border-radius:50%}
+#cur{width:30px;height:30px;margin:-15px 0 0 -15px;border:1px solid var(--ink);
+  border-radius:50%;will-change:transform;transition:background .25s,border-color .25s}
+#cur.hov{background:rgba(198,58,30,.14);border-color:var(--seal)}
+
+@media (max-width:880px){
+  #rail{display:none}
+  #meta .cell:first-child{display:none}
+  .study-head{grid-template-columns:auto auto 1fr;gap:12px}
+  .study-head .no{display:none}
+  .blotwrap{grid-template-columns:1fr;gap:20px}
+  .lab{height:52vh;min-height:320px}
+  .ghost{font-size:clamp(90px,26vw,180px);opacity:.7}
+  #brand .kanji{font-size:27px}
+}
+@media (prefers-reduced-motion:reduce){
+  .booting [data-ui]{opacity:1}
+  #status .tick,.hero-cue .drop{animation:none}
+}
+</style>
+</head>
+<body>
+
+<!-- filters: liquid displacement for type · metaball threshold for the jelly tray -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="liq" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence id="liq-turb" type="fractalNoise" baseFrequency="0.011 0.017" numOctaves="2" seed="7" result="n"/>
+      <feDisplacementMap id="liq-disp" in="SourceGraphic" in2="n" scale="0" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="goo">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="b"/>
+      <feColorMatrix in="b" mode="matrix"
+        values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -8" result="g"/>
+      <feComposite in="SourceGraphic" in2="g" operator="atop"/>
+    </filter>
+  </defs>
+</svg>
+
+<canvas id="ink" aria-hidden="true"></canvas>
+<div id="grain" aria-hidden="true"></div>
+
+<div id="brand" class="chrome" data-ui>
+  <span class="kanji" aria-hidden="true">墨</span>
+  <span class="stack">
+    <span class="word">SUMI</span>
+    <span class="sub">soft-matter atelier · 4 studies</span>
+  </span>
+</div>
+<div id="meta" class="chrome" data-ui>
+  <span class="cell"><b id="m-n">—</b> grains · <b id="m-eng">—</b></span>
+  <button id="inkbtn" aria-label="cycle ink pigment">ink · <b id="inkname">sumi</b></button>
+</div>
+<nav id="rail" class="chrome" data-ui aria-label="studies">
+  <a href="#hero" data-sec="hero"><span class="k">墨</span>top</a>
+  <span class="rule"></span>
+  <a href="#s-flow" data-sec="s-flow"><span class="k">流</span>flow</a>
+  <a href="#s-elastic" data-sec="s-elastic"><span class="k">弾</span>elastic</a>
+  <a href="#s-soft" data-sec="s-soft"><span class="k">柔</span>soft</a>
+  <a href="#s-weight" data-sec="s-weight"><span class="k">重</span>weight</a>
+</nav>
+<div id="status" class="chrome" data-ui><span class="tick"></span><span>scroll — the ink remembers</span></div>
+
+<main>
+  <!-- ================= HERO ================= -->
+  <section id="hero">
+    <div class="hero-pin wrap">
+      <div>
+        <div class="hero-eyebrow" data-ui><span class="rule"></span>
+          <span>a study of soft matter · est. in webgl</span></div>
+        <h1 class="hero-claim" data-ui>Two hundred sixty-two thousand grains of
+          <em>ink</em> obey a field of springs and curl noise.
+          <span class="v">Drag through them.</span> They remember every stroke.</h1>
+        <p class="hero-note" data-ui>hold — the ink gathers to your hand · release — it bursts ·
+          scroll — the word lets go of its shape</p>
+      </div>
+      <div class="hero-cue" data-ui><span class="drop"></span><span>scroll</span></div>
+    </div>
+  </section>
+
+  <!-- ================= MARQUEE ================= -->
+  <div id="marq" aria-hidden="true">
+    <div class="track" id="marq-track"></div>
+  </div>
+
+  <!-- ================= STUDY 01 · FLOW ================= -->
+  <section class="study" id="s-flow">
+    <div class="wrap">
+      <div class="ghost" aria-hidden="true">流</div>
+      <div class="study-head">
+        <span class="k" aria-hidden="true">流</span>
+        <h2>FLOW</h2>
+        <span class="rule"></span>
+        <span class="no">study 01 / 04</span>
+      </div>
+      <div class="study-copy" data-rev>
+        <p class="lead">Released from the word, the grains ride a divergence-free
+          velocity field — the 2-D curl of simplex noise, ∇×ψ — so the ink swirls
+          without ever compressing.</p>
+        <p>Your pointer is a wet brush. Its velocity is injected straight into the
+          field as an impulse with a Gaussian falloff, plus a perpendicular swirl
+          term, so a fast flick leaves a vortex street behind it. Press and hold
+          anywhere and a spring force gathers the pigment to your fingertip;
+          let go and it detonates outward. Each frame the trail buffer fades a
+          few percent toward paper — the physics of a drying stroke.</p>
+        <p class="fn">integrator · semi-implicit euler on the gpu — one texel per grain
+          <br/>field · F = (∂ψ/∂y, −∂ψ/∂x) + brush + springs, damped per-frame
+          <br/>memory · ping-pong render targets, ink trail = exponential decay to paper</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= STUDY 02 · ELASTIC ================= -->
+  <section class="study" id="s-elastic">
+    <div class="wrap">
+      <div class="ghost" aria-hidden="true">弾</div>
+      <div class="study-head">
+        <span class="k" aria-hidden="true">弾</span>
+        <h2>ELASTIC</h2>
+        <span class="rule"></span>
+        <span class="no">study 02 / 04</span>
+      </div>
+      <div class="study-copy" data-rev>
+        <p class="lead">Letterforms behave like wet media: move across the word and a
+          turbulence-displacement filter warps the glyph outlines in real time,
+          scaled by pointer proximity and scroll velocity.</p>
+      </div>
+      <h3 id="eword" data-rev aria-label="ELASTIC">ELASTIC</h3>
+      <p class="ecap" data-rev>brush across the word · each letter is a spring — scroll fast and the whole line goes liquid</p>
+
+      <div class="blotwrap">
+        <svg id="blot" viewBox="0 0 320 320" role="button" tabindex="0"
+             aria-label="morph the ink blot"><path id="blot-path" d=""/></svg>
+        <div class="blotcopy" data-rev>
+          <p class="lead">The blot is a flubber-style morph: every silhouette is
+            resampled to the same 140 points, then each vertex is interpolated to
+            its partner under an elastic ease — so the shape overshoots, wobbles,
+            and settles like gelatin.</p>
+          <span id="blotname">blot · 01</span>
+          <p class="fn">tap the blot to cycle silhouettes ·
+            equal-point resampling → per-vertex lerp → elastic.out(1, 0.36)</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= STUDY 03 · SOFT ================= -->
+  <section class="study" id="s-soft">
+    <div class="wrap">
+      <div class="ghost" aria-hidden="true">柔</div>
+      <div class="study-head">
+        <span class="k" aria-hidden="true">柔</span>
+        <h2>SOFT</h2>
+        <span class="rule"></span>
+        <span class="no">study 03 / 04</span>
+      </div>
+      <div class="study-copy" data-rev>
+        <p class="lead">A tray of rigid-body ink drops under a metaball threshold:
+          blur the alpha, then clip it hard, and separate circles read as one
+          continuous liquid.</p>
+        <p>The slab in the middle is a hand-built soft body — a 4×4 lattice of
+          small bodies laced with structural and shear spring constraints. Grab
+          anything and throw it. One drop is vermillion; the seal always
+          survives.</p>
+        <p class="fn">matter.js rigid bodies · constraint lattice, stiffness .06 / .03
+          · svg feGaussianBlur → alpha contrast → composite</p>
+      </div>
+      <div class="lab" id="soft-lab" data-rev>
+        <span class="corner tl"></span><span class="corner tr"></span>
+        <span class="corner bl"></span><span class="corner br"></span>
+        <span class="tag">tray 柔 · drag the drops</span>
+        <canvas id="soft-canvas" style="filter:url(#goo)"></canvas>
+        <div class="tools">
+          <button class="btn" id="b-flip">flip g</button>
+          <button class="btn seal" id="b-disturb">disturb</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= STUDY 04 · WEIGHT ================= -->
+  <section class="study" id="s-weight">
+    <div class="wrap">
+      <div class="ghost" aria-hidden="true">重</div>
+      <div class="study-head">
+        <span class="k" aria-hidden="true">重</span>
+        <h2>WEIGHT</h2>
+        <span class="rule"></span>
+        <span class="no">study 04 / 04</span>
+      </div>
+      <div class="study-copy" data-rev>
+        <p class="lead">Three brushes hang by Verlet ropes — position-based dynamics,
+          twelve constraint passes per frame, so the strands are inextensible but
+          the bobs carry real momentum.</p>
+        <p>The heaviest bob swings slowest and hits hardest. Grab one, fling it,
+          and watch the rope crack like a whip; a breath of simplex wind keeps
+          them from ever quite resting.</p>
+        <p class="fn">x′ = x + (x − x₋₁)·drag + a·dt² · distance constraints ×12 ·
+          tapered ink strokes drawn through the chain</p>
+      </div>
+      <div class="lab" id="rope-lab" data-rev>
+        <span class="corner tl"></span><span class="corner tr"></span>
+        <span class="corner bl"></span><span class="corner br"></span>
+        <span class="tag">pendulum 重 · grab a bob</span>
+        <canvas id="rope-canvas"></canvas>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ================= FOOTER · 空 ================= -->
+<footer id="end">
+  <div class="wrap">
+    <div class="kbig" aria-hidden="true">空</div>
+    <div id="sealbox" aria-hidden="true">墨<small>SUMI</small></div>
+    <p class="colophon">emptiness, then ink. set in zen old mincho &amp; space mono ·
+      simulated in webgl — three.js, gsap + scrolltrigger, anime.js, matter.js ·
+      lenis-style scrub smoothing &amp; flubber-style morphs, re-implemented inline.</p>
+    <button class="btn" id="top">return to the first stroke</button>
+  </div>
+</footer>
+
+<div id="veil" aria-hidden="true">
+  <svg viewBox="0 0 160 160"><path id="veil-drop" d=""/></svg>
+  <span id="vline">grinding the ink stick …</span>
+  <span id="count">000</span>
+</div>
+
+<div id="curdot" aria-hidden="true"></div>
+<div id="cur" aria-hidden="true"></div>
+
+<div id="nogl">SUMI needs WebGL and a modern browser.<br/>the ink could not be mixed on this device.</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+
+<script>
+/* ==================================================================
+   SUMI · soft-matter atelier
+   ------------------------------------------------------------------
+   INK    – GPGPU particle fluid: one texel per grain, ping-pong FBOs,
+            semi-implicit Euler in a fragment shader, curl-noise field,
+            brush impulses, spring formations (word / ensō / waves),
+            exponential trail buffer = drying ink. CPU fallback.
+   MORPH  – flubber-style equal-point resample + interpolation
+   TYPE   – feTurbulence/feDisplacementMap liquid glyphs + letter springs
+   SOFT   – Matter.js tray: rigid drops + hand-built jelly lattice,
+            metaball threshold filter
+   ROPE   – Verlet ropes with heavy bobs, tapered ink strokes
+   CHOREO – native scroll + ScrollTrigger scrub (lenis-style smoothing),
+            statechart for app phase, anime.js micro-motion
+   ================================================================== */
+(function () {
+'use strict';
+
+var docEl = document.documentElement;
+docEl.classList.add('booting');
+
+if (!window.THREE || !window.gsap) {
+  document.getElementById('nogl').style.display = 'flex';
+  var v0 = document.getElementById('veil'); if (v0) v0.style.display = 'none';
+  docEl.classList.remove('booting');
+  return;
+}
+if (window.ScrollTrigger) gsap.registerPlugin(ScrollTrigger);
+var HAS_ST = !!window.ScrollTrigger;
+var HAS_ANIME = !!window.anime;
+var HAS_MATTER = !!window.Matter;
+var RM = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var FINE = window.matchMedia('(pointer: fine)').matches;
+if (FINE) document.body.classList.add('fine');
+
+var TAU = Math.PI * 2;
+function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function rand(a, b) { return a + Math.random() * (b - a); }
+
+/* ---------- CPU simplex (rope wind + fallback field) ---------- */
+var NOISE = (function () {
+  var grad3 = new Float32Array([1,1,0,-1,1,0,1,-1,0,-1,-1,0,1,0,1,-1,0,1,1,0,-1,-1,0,-1,0,1,1,0,-1,1,0,1,-1,0,-1,-1]);
+  var p = new Uint8Array(256), i, s = 1337, j, t;
+  for (i = 0; i < 256; i++) p[i] = i;
+  for (i = 255; i > 0; i--) {
+    s ^= s << 13; s ^= s >>> 17; s ^= s << 5;
+    j = (s >>> 0) % (i + 1); t = p[i]; p[i] = p[j]; p[j] = t;
+  }
+  var perm = new Uint8Array(512), perm12 = new Uint8Array(512);
+  for (i = 0; i < 512; i++) { perm[i] = p[i & 255]; perm12[i] = perm[i] % 12; }
+  var F3 = 1 / 3, G3 = 1 / 6;
+  function n3(xin, yin, zin) {
+    var n0, n1, n2, n3v;
+    var sk = (xin + yin + zin) * F3;
+    var i0 = Math.floor(xin + sk), j0 = Math.floor(yin + sk), k0 = Math.floor(zin + sk);
+    var t0 = (i0 + j0 + k0) * G3;
+    var x0 = xin - (i0 - t0), y0 = yin - (j0 - t0), z0 = zin - (k0 - t0);
+    var i1, j1, k1, i2, j2, k2;
+    if (x0 >= y0) {
+      if (y0 >= z0)      { i1=1;j1=0;k1=0;i2=1;j2=1;k2=0; }
+      else if (x0 >= z0) { i1=1;j1=0;k1=0;i2=1;j2=0;k2=1; }
+      else               { i1=0;j1=0;k1=1;i2=1;j2=0;k2=1; }
+    } else {
+      if (y0 < z0)       { i1=0;j1=0;k1=1;i2=0;j2=1;k2=1; }
+      else if (x0 < z0)  { i1=0;j1=1;k1=0;i2=0;j2=1;k2=1; }
+      else               { i1=0;j1=1;k1=0;i2=1;j2=1;k2=0; }
+    }
+    var x1 = x0-i1+G3,   y1 = y0-j1+G3,   z1 = z0-k1+G3;
+    var x2 = x0-i2+2*G3, y2 = y0-j2+2*G3, z2 = z0-k2+2*G3;
+    var x3 = x0-1+3*G3,  y3 = y0-1+3*G3,  z3 = z0-1+3*G3;
+    var ii = i0 & 255, jj = j0 & 255, kk = k0 & 255, gi, tt;
+    tt = 0.6 - x0*x0 - y0*y0 - z0*z0;
+    if (tt < 0) n0 = 0; else { gi = perm12[ii+perm[jj+perm[kk]]]*3; tt*=tt; n0 = tt*tt*(grad3[gi]*x0+grad3[gi+1]*y0+grad3[gi+2]*z0); }
+    tt = 0.6 - x1*x1 - y1*y1 - z1*z1;
+    if (tt < 0) n1 = 0; else { gi = perm12[ii+i1+perm[jj+j1+perm[kk+k1]]]*3; tt*=tt; n1 = tt*tt*(grad3[gi]*x1+grad3[gi+1]*y1+grad3[gi+2]*z1); }
+    tt = 0.6 - x2*x2 - y2*y2 - z2*z2;
+    if (tt < 0) n2 = 0; else { gi = perm12[ii+i2+perm[jj+j2+perm[kk+k2]]]*3; tt*=tt; n2 = tt*tt*(grad3[gi]*x2+grad3[gi+1]*y2+grad3[gi+2]*z2); }
+    tt = 0.6 - x3*x3 - y3*y3 - z3*z3;
+    if (tt < 0) n3v = 0; else { gi = perm12[ii+1+perm[jj+1+perm[kk+1]]]*3; tt*=tt; n3v = tt*tt*(grad3[gi]*x3+grad3[gi+1]*y3+grad3[gi+2]*z3); }
+    return 32 * (n0 + n1 + n2 + n3v);
+  }
+  return { n3: n3 };
+})();
+
+/* ---------- pocket statechart ---------- */
+function createMachine(cfg) {
+  var m = {
+    state: cfg.initial,
+    send: function (evt) {
+      var node = cfg.states[m.state];
+      var target = node.on && node.on[evt];
+      if (!target) return;
+      if (node.exit) node.exit();
+      m.state = target;
+      var next = cfg.states[target];
+      if (next.entry) next.entry();
+    }
+  };
+  var first = cfg.states[cfg.initial];
+  if (first.entry) first.entry();
+  return m;
+}
+
+/* ---------- MORPH: flubber-style equal-point resample + lerp ---------- */
+var MORPH = (function () {
+  function resample(pts, M) {
+    /* pts: flat [x,y,...] closed polygon → M equally spaced points */
+    var n = pts.length / 2, lens = [0], total = 0, i;
+    for (i = 0; i < n; i++) {
+      var x0 = pts[i*2], y0 = pts[i*2+1];
+      var x1 = pts[((i+1)%n)*2], y1 = pts[((i+1)%n)*2+1];
+      total += Math.hypot(x1-x0, y1-y0);
+      lens.push(total);
+    }
+    var out = new Float32Array(M*2), seg = 0;
+    for (i = 0; i < M; i++) {
+      var d = (i / M) * total;
+      while (seg < n - 1 && lens[seg+1] < d) seg++;
+      var l0 = lens[seg], l1 = lens[seg+1];
+      var f = l1 > l0 ? (d - l0) / (l1 - l0) : 0;
+      var a = seg % n, b = (seg + 1) % n;
+      out[i*2]   = lerp(pts[a*2],   pts[b*2],   f);
+      out[i*2+1] = lerp(pts[a*2+1], pts[b*2+1], f);
+    }
+    return out;
+  }
+  function toPath(pts) {
+    var d = '', M = pts.length / 2;
+    for (var i = 0; i < M; i++) {
+      d += (i === 0 ? 'M' : 'L') + pts[i*2].toFixed(1) + ' ' + pts[i*2+1].toFixed(1);
+    }
+    return d + 'Z';
+  }
+  function mix(a, b, t, out) {
+    for (var i = 0; i < a.length; i++) out[i] = a[i] + (b[i] - a[i]) * t;
+    return out;
+  }
+  return { resample: resample, toPath: toPath, mix: mix };
+})();
+
+/* ---------- pigments ---------- */
+var PIGMENTS = [
+  { name: 'sumi',   hex: '#101418' },
+  { name: 'ai',     hex: '#27364b' },
+  { name: 'shu',    hex: '#a5311c' }
+];
+var pig = 0;
+var PAPER = { r: 231/255, g: 235/255, b: 238/255 };
+
+/* ==================================================================
+   INK — the GPGPU fluid
+   ================================================================== */
+var INK = (function () {
+  var canvas = document.getElementById('ink');
+  var renderer, gl;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: false, alpha: false,
+      powerPreference: 'high-performance', preserveDrawingBuffer: false });
+    gl = renderer.getContext();
+  } catch (e) { return { ok: false }; }
+  var DPR = Math.min(window.devicePixelRatio || 1, 1.75);
+  renderer.setPixelRatio(DPR);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.autoClear = false;
+
+  var MOBILE = Math.min(window.innerWidth, window.innerHeight) < 760 || !FINE;
+
+  /* --- GLSL: Ashima 3-D simplex noise --- */
+  var GLSL_NOISE = [
+    'vec3 mod289(vec3 x){return x - floor(x * (1.0/289.0)) * 289.0;}',
+    'vec4 mod289(vec4 x){return x - floor(x * (1.0/289.0)) * 289.0;}',
+    'vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);}',
+    'vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}',
+    'float snoise(vec3 v){',
+    '  const vec2 C = vec2(1.0/6.0, 1.0/3.0);',
+    '  const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);',
+    '  vec3 i  = floor(v + dot(v, C.yyy));',
+    '  vec3 x0 = v - i + dot(i, C.xxx);',
+    '  vec3 g = step(x0.yzx, x0.xyz);',
+    '  vec3 l = 1.0 - g;',
+    '  vec3 i1 = min(g.xyz, l.zxy);',
+    '  vec3 i2 = max(g.xyz, l.zxy);',
+    '  vec3 x1 = x0 - i1 + C.xxx;',
+    '  vec3 x2 = x0 - i2 + C.yyy;',
+    '  vec3 x3 = x0 - D.yyy;',
+    '  i = mod289(i);',
+    '  vec4 p = permute(permute(permute(',
+    '        i.z + vec4(0.0, i1.z, i2.z, 1.0))',
+    '      + i.y + vec4(0.0, i1.y, i2.y, 1.0))',
+    '      + i.x + vec4(0.0, i1.x, i2.x, 1.0));',
+    '  float n_ = 0.142857142857;',
+    '  vec3 ns = n_ * D.wyz - D.xzx;',
+    '  vec4 j = p - 49.0 * floor(p * ns.z * ns.z);',
+    '  vec4 x_ = floor(j * ns.z);',
+    '  vec4 y_ = floor(j - 7.0 * x_);',
+    '  vec4 x = x_ * ns.x + ns.yyyy;',
+    '  vec4 y = y_ * ns.x + ns.yyyy;',
+    '  vec4 h = 1.0 - abs(x) - abs(y);',
+    '  vec4 b0 = vec4(x.xy, y.xy);',
+    '  vec4 b1 = vec4(x.zw, y.zw);',
+    '  vec4 s0 = floor(b0) * 2.0 + 1.0;',
+    '  vec4 s1 = floor(b1) * 2.0 + 1.0;',
+    '  vec4 sh = -step(h, vec4(0.0));',
+    '  vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;',
+    '  vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;',
+    '  vec3 p0 = vec3(a0.xy, h.x);',
+    '  vec3 p1 = vec3(a0.zw, h.y);',
+    '  vec3 p2 = vec3(a1.xy, h.z);',
+    '  vec3 p3 = vec3(a1.zw, h.w);',
+    '  vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));',
+    '  p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;',
+    '  vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);',
+    '  m = m * m;',
+    '  return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));',
+    '}'
+  ].join('\n');
+
+  var QUAD_VS = [
+    'varying vec2 vUv;',
+    'void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }'
+  ].join('\n');
+
+  var SIM_FS = [
+    'precision highp float;',
+    'varying vec2 vUv;',
+    'uniform sampler2D uState;',
+    'uniform sampler2D uTA;',
+    'uniform sampler2D uTB;',
+    'uniform float uMix, uForm, uDt, uTime, uDampF, uFlow;',
+    'uniform float uBrush, uSwirl, uGrab, uBurst, uAspect;',
+    'uniform vec2 uPtr, uPtrVel, uBurstP;',
+    GLSL_NOISE,
+    'vec2 curl(vec2 p, float t){',
+    '  float e = 0.09;',
+    '  float a = snoise(vec3(p.x, p.y + e, t));',
+    '  float b = snoise(vec3(p.x, p.y - e, t));',
+    '  float c = snoise(vec3(p.x + e, p.y, t));',
+    '  float d = snoise(vec3(p.x - e, p.y, t));',
+    '  return vec2(a - b, d - c) / (2.0 * e);',
+    '}',
+    'void main(){',
+    '  vec4 s  = texture2D(uState, vUv);',
+    '  vec4 ta = texture2D(uTA, vUv);',
+    '  vec4 tb = texture2D(uTB, vUv);',
+    '  vec2 pos = s.xy, vel = s.zw;',
+    '  vec2 targ = mix(ta.xy, tb.xy, uMix);',
+    '  float wgt = mix(ta.z, tb.z, uMix);',
+    '  float rnd = ta.w;',
+    '  vec2 F = curl(pos * 1.35 + rnd * 6.7, uTime * 0.22) * uFlow * (0.55 + 0.9 * rnd);',
+    '  F += (targ - pos) * (uForm * wgt * (26.0 + 34.0 * rnd));',
+    '  vec2 d = pos - uPtr;',
+    '  float g = exp(-dot(d, d) * 24.0);',
+    '  F += uPtrVel * (g * uBrush);',
+    '  F += vec2(-d.y, d.x) * (g * uSwirl * min(length(uPtrVel) * 2.0, 1.0));',
+    '  F -= d * (uGrab * 34.0 * exp(-dot(d, d) * 6.0));',
+    '  vec2 bd = pos - uBurstP;',
+    '  float bl = length(bd) + 0.0001;',
+    '  F += (bd / bl) * uBurst * exp(-bl * bl * 3.2) * 95.0;',
+    '  float m = 0.985;',
+    '  if (pos.x >  uAspect * m) F.x -= (pos.x - uAspect * m) * 90.0;',
+    '  if (pos.x < -uAspect * m) F.x -= (pos.x + uAspect * m) * 90.0;',
+    '  if (pos.y >  m) F.y -= (pos.y - m) * 90.0;',
+    '  if (pos.y < -m) F.y -= (pos.y + m) * 90.0;',
+    '  vel = (vel + F * uDt) * uDampF;',
+    '  pos += vel * uDt;',
+    '  gl_FragColor = vec4(pos, vel);',
+    '}'
+  ].join('\n');
+
+  var PTS_VS = [
+    'precision highp float;',
+    'uniform sampler2D uState;',
+    'uniform float uPx, uAspect;',
+    'attribute vec2 aRef;',
+    'varying float vSpd;',
+    'varying float vRnd;',
+    'attribute float aRnd;',
+    'void main(){',
+    '  vec4 s = texture2D(uState, aRef);',
+    '  float spd = length(s.zw);',
+    '  vSpd = spd; vRnd = aRnd;',
+    '  gl_Position = vec4(s.x / uAspect, s.y, 0.0, 1.0);',
+    '  gl_PointSize = uPx * (0.8 + aRnd * 0.8) * (1.0 + min(spd * 0.5, 1.5));',
+    '}'
+  ].join('\n');
+
+  var PTS_FS = [
+    'precision highp float;',
+    'uniform vec3 uInk;',
+    'uniform float uAlpha;',
+    'varying float vSpd;',
+    'varying float vRnd;',
+    'void main(){',
+    '  vec2 uv = gl_PointCoord - 0.5;',
+    '  float dd = length(uv) * 2.0;',
+    '  if (dd > 1.0) discard;',
+    '  float core = smoothstep(1.0, 0.25, dd);',
+    '  float dry = 1.0 - 0.4 * min(vSpd, 1.2);',
+    '  gl_FragColor = vec4(uInk, uAlpha * core * dry * (0.6 + 0.4 * vRnd));',
+    '}'
+  ].join('\n');
+
+  var FADE_FS = [
+    'precision highp float;',
+    'uniform vec3 uPaper;',
+    'uniform float uFade;',
+    'void main(){ gl_FragColor = vec4(uPaper, uFade); }'
+  ].join('\n');
+
+  var COPY_FS = [
+    'precision highp float;',
+    'varying vec2 vUv;',
+    'uniform sampler2D uTex;',
+    'void main(){ gl_FragColor = texture2D(uTex, vUv); }'
+  ].join('\n');
+
+  /* --- shared quad scenes --- */
+  var quadGeom = new THREE.PlaneBufferGeometry(2, 2);
+  var camera2 = new THREE.Camera();
+  function quadScene(mat) {
+    var sc = new THREE.Scene();
+    sc.add(new THREE.Mesh(quadGeom, mat));
+    return sc;
+  }
+
+  var SIM = 0, COUNT = 0, aspect = 1, gpu = false;
+  var rtA, rtB, trail, cur = 0;
+  var simMat, ptsMat, fadeMat, copyMat;
+  var simScene, ptsScene, fadeScene, copyScene;
+  var U = { form: 0, mix: 0, flow: 0.8, fade: 0.055, brush: 1.15, swirl: 0.5,
+            grab: 0, burst: 0, alpha: 0.5, px: 1.35, damp: 0.955 };
+  var burstP = { x: 0, y: 0 };
+  var ptr = { x: 0, y: 0, vx: 0, vy: 0 };
+  var inkCol = new THREE.Color(PIGMENTS[0].hex);
+
+  function makeSimRT(size, type) {
+    return new THREE.WebGLRenderTarget(size, size, {
+      minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
+      format: THREE.RGBAFormat, type: type,
+      depthBuffer: false, stencilBuffer: false
+    });
+  }
+  function floatRTWorks() {
+    try {
+      var rt = makeSimRT(4, THREE.FloatType);
+      var m = new THREE.ShaderMaterial({ vertexShader: QUAD_VS, fragmentShader: COPY_FS,
+        uniforms: { uTex: { value: null } } });
+      var sc = quadScene(m);
+      renderer.setRenderTarget(rt);
+      renderer.render(sc, camera2);
+      var ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+      renderer.setRenderTarget(null);
+      rt.dispose(); m.dispose();
+      return ok;
+    } catch (e) { renderer.setRenderTarget(null); return false; }
+  }
+
+  /* ---------- formation target baking (CPU → texture / arrays) ---------- */
+  var TG = {}, curA = 'free', curB = 'free';
+  var texA = null, texB = null;
+  var GLYPH_FONT = '"Zen Old Mincho", "Hiragino Mincho ProN", Georgia, serif';
+
+  function samplePts(draw, w, h, step) {
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    var x2 = c.getContext('2d');
+    x2.fillStyle = '#fff';
+    draw(x2, w, h);
+    var img = x2.getImageData(0, 0, w, h).data;
+    var pts = [];
+    for (var y = 0; y < h; y += step) {
+      for (var x = 0; x < w; x += step) {
+        if (img[(y * w + x) * 4 + 3] > 110) pts.push(x, y);
+      }
+    }
+    return pts;
+  }
+
+  function fillFromPts(arr, pts, w, h, worldW, wgt, cy) {
+    var M = pts.length / 2;
+    var sc = worldW / w, oy = cy || 0;
+    for (var i = 0; i < COUNT; i++) {
+      var pi = (i % M) * 2;
+      arr[i*4]   = (pts[pi] - w / 2) * sc + rand(-0.012, 0.012);
+      arr[i*4+1] = (h / 2 - pts[pi+1]) * sc + oy + rand(-0.012, 0.012);
+      arr[i*4+2] = wgt;
+      /* keep .w (per-grain rand) untouched by caller */
+    }
+  }
+
+  function bakeTargets() {
+    var mk = function () {
+      var a = new Float32Array(COUNT * 4);
+      for (var i = 0; i < COUNT; i++) a[i*4+3] = Math.random();
+      return a;
+    };
+    if (!TG.word) { TG.word = mk(); TG.ku = mk(); TG.enso = mk(); TG.waves = mk(); TG.free = mk(); }
+
+    /* free: no springs */
+    var i, fr = TG.free;
+    for (i = 0; i < COUNT; i++) { fr[i*4] = 0; fr[i*4+1] = 0; fr[i*4+2] = 0; }
+
+    /* SUMI wordmark */
+    var wpts = samplePts(function (x2, w, h) {
+      x2.font = '900 300px ' + GLYPH_FONT;
+      x2.textAlign = 'center'; x2.textBaseline = 'middle';
+      x2.fillText('SUMI', w / 2, h / 2 + 14);
+    }, 1180, 460, 2);
+    fillFromPts(TG.word, wpts, 1180, 460, Math.min(aspect * 1.66, 3.3), 1, 0.05);
+
+    /* 空 — the void glyph, for the footer */
+    var kpts = samplePts(function (x2, w, h) {
+      x2.font = '900 430px ' + GLYPH_FONT;
+      x2.textAlign = 'center'; x2.textBaseline = 'middle';
+      x2.fillText('\u7A7A', w / 2, h / 2 + 26);
+    }, 560, 560, 2);
+    fillFromPts(TG.ku, kpts, 560, 560, Math.min(1.62, aspect * 1.2), 0.95, 0);
+
+    /* ensō — open brush circle */
+    var en = TG.enso;
+    for (i = 0; i < COUNT; i++) {
+      var a = rand(0, TAU);
+      /* opening at upper-right (~ -0.9 rad), width .55 rad */
+      var gap = Math.abs(((a - (-0.9) + Math.PI) % TAU) - Math.PI);
+      if (gap < 0.34) a += 0.8;
+      var th = 0.035 + 0.075 * Math.abs(Math.sin(a * 1.5 + 0.6)) + Math.pow(Math.random(), 3) * 0.05;
+      var r = 0.63 + rand(-th, th);
+      en[i*4]   = Math.cos(a) * r;
+      en[i*4+1] = Math.sin(a) * r + 0.02;
+      en[i*4+2] = 0.85;
+    }
+
+    /* waves — three ink bands */
+    var wv = TG.waves;
+    for (i = 0; i < COUNT; i++) {
+      var band = i % 3;
+      var x = rand(-aspect * 0.94, aspect * 0.94);
+      var base = (band - 1) * 0.52;
+      wv[i*4]   = x;
+      wv[i*4+1] = base + Math.sin(x * 3.1 + band * 2.1) * 0.16 + rand(-0.045, 0.045);
+      wv[i*4+2] = 0.8;
+    }
+  }
+
+  function makeTargetTex(arr) {
+    var t = new THREE.DataTexture(new Float32Array(arr), SIM, SIM, THREE.RGBAFormat, THREE.FloatType);
+    t.minFilter = THREE.NearestFilter; t.magFilter = THREE.NearestFilter;
+    t.needsUpdate = true;
+    return t;
+  }
+  function uploadTarget(tex, name) {
+    tex.image.data.set(TG[name]);
+    tex.needsUpdate = true;
+  }
+
+  /* ---------- GPU init ---------- */
+  function initGPU() {
+    SIM = MOBILE ? 256 : 512;
+    COUNT = SIM * SIM;
+    aspect = window.innerWidth / window.innerHeight;
+    bakeTargets();
+
+    rtA = makeSimRT(SIM, THREE.FloatType);
+    rtB = makeSimRT(SIM, THREE.FloatType);
+
+    /* seed state: random scatter, zero velocity */
+    var seed = new Float32Array(COUNT * 4);
+    for (var i = 0; i < COUNT; i++) {
+      seed[i*4]   = rand(-aspect, aspect);
+      seed[i*4+1] = rand(-1, 1);
+    }
+    var seedTex = new THREE.DataTexture(seed, SIM, SIM, THREE.RGBAFormat, THREE.FloatType);
+    seedTex.minFilter = THREE.NearestFilter; seedTex.magFilter = THREE.NearestFilter;
+    seedTex.needsUpdate = true;
+
+    copyMat = new THREE.ShaderMaterial({ vertexShader: QUAD_VS, fragmentShader: COPY_FS,
+      uniforms: { uTex: { value: seedTex } } });
+    copyScene = quadScene(copyMat);
+    renderer.setRenderTarget(rtA); renderer.render(copyScene, camera2);
+    renderer.setRenderTarget(rtB); renderer.render(copyScene, camera2);
+    renderer.setRenderTarget(null);
+
+    texA = makeTargetTex(TG.word);
+    texB = makeTargetTex(TG.free);
+    curA = 'word'; curB = 'free';
+
+    simMat = new THREE.ShaderMaterial({
+      vertexShader: QUAD_VS, fragmentShader: SIM_FS,
+      uniforms: {
+        uState: { value: null }, uTA: { value: texA }, uTB: { value: texB },
+        uMix: { value: 0 }, uForm: { value: 0 }, uDt: { value: 0.016 },
+        uTime: { value: 0 }, uDampF: { value: 0.9 }, uFlow: { value: U.flow },
+        uBrush: { value: U.brush }, uSwirl: { value: U.swirl },
+        uGrab: { value: 0 }, uBurst: { value: 0 }, uAspect: { value: aspect },
+        uPtr: { value: new THREE.Vector2(0, 0) },
+        uPtrVel: { value: new THREE.Vector2(0, 0) },
+        uBurstP: { value: new THREE.Vector2(0, 0) }
+      }
+    });
+    simScene = quadScene(simMat);
+
+    /* points cloud referencing the sim texture */
+    var refs = new Float32Array(COUNT * 2);
+    var rnds = new Float32Array(COUNT);
+    var posz = new Float32Array(COUNT * 3);
+    for (var k = 0; k < COUNT; k++) {
+      refs[k*2]   = ((k % SIM) + 0.5) / SIM;
+      refs[k*2+1] = (Math.floor(k / SIM) + 0.5) / SIM;
+      rnds[k] = Math.random();
+    }
+    var pg = new THREE.BufferGeometry();
+    pg.setAttribute('position', new THREE.BufferAttribute(posz, 3));
+    pg.setAttribute('aRef', new THREE.BufferAttribute(refs, 2));
+    pg.setAttribute('aRnd', new THREE.BufferAttribute(rnds, 1));
+    ptsMat = new THREE.ShaderMaterial({
+      vertexShader: PTS_VS, fragmentShader: PTS_FS,
+      transparent: true, depthWrite: false, depthTest: false,
+      blending: THREE.NormalBlending,
+      uniforms: {
+        uState: { value: null }, uPx: { value: U.px * DPR },
+        uAspect: { value: aspect },
+        uInk: { value: new THREE.Vector3(inkCol.r, inkCol.g, inkCol.b) },
+        uAlpha: { value: U.alpha }
+      }
+    });
+    var pcloud = new THREE.Points(pg, ptsMat);
+    pcloud.frustumCulled = false;
+    ptsScene = new THREE.Scene();
+    ptsScene.add(pcloud);
+
+    fadeMat = new THREE.ShaderMaterial({
+      vertexShader: QUAD_VS, fragmentShader: FADE_FS,
+      transparent: true, depthWrite: false, depthTest: false,
+      uniforms: { uPaper: { value: new THREE.Vector3(PAPER.r, PAPER.g, PAPER.b) },
+                  uFade: { value: 1 } }
+    });
+    fadeScene = quadScene(fadeMat);
+
+    makeTrail();
+    gpu = true;
+  }
+
+  var TS = 0.62;
+  function makeTrail() {
+    if (trail) trail.dispose();
+    var tw = Math.max(2, Math.floor(window.innerWidth * DPR * TS));
+    var th = Math.max(2, Math.floor(window.innerHeight * DPR * TS));
+    trail = new THREE.WebGLRenderTarget(tw, th, {
+      minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat, depthBuffer: false, stencilBuffer: false
+    });
+    /* prime with paper */
+    fadeMat.uniforms.uFade.value = 1;
+    renderer.setRenderTarget(trail);
+    renderer.render(fadeScene, camera2);
+    renderer.setRenderTarget(null);
+    fadeMat.uniforms.uFade.value = U.fade;
+    if (dispMat) dispMat.uniforms.uTex.value = trail.texture;
+  }
+
+  var dispMat = null, dispScene = null;
+  function makeDisplay() {
+    dispMat = new THREE.ShaderMaterial({ vertexShader: QUAD_VS, fragmentShader: COPY_FS,
+      uniforms: { uTex: { value: trail.texture } } });
+    dispScene = quadScene(dispMat);
+  }
+
+  /* ---------- CPU fallback ---------- */
+  var C = null; /* cpu state */
+  function initCPU() {
+    SIM = 0;
+    COUNT = MOBILE ? 4200 : 7000;
+    aspect = window.innerWidth / window.innerHeight;
+    bakeTargets();
+    C = {
+      px: new Float32Array(COUNT), py: new Float32Array(COUNT),
+      vx: new Float32Array(COUNT), vy: new Float32Array(COUNT),
+      rnd: new Float32Array(COUNT)
+    };
+    for (var i = 0; i < COUNT; i++) {
+      C.px[i] = rand(-aspect, aspect); C.py[i] = rand(-1, 1);
+      C.rnd[i] = Math.random();
+    }
+    var posz = new Float32Array(COUNT * 3);
+    var rnds = new Float32Array(COUNT);
+    for (var k = 0; k < COUNT; k++) rnds[k] = C.rnd[k];
+    var pg = new THREE.BufferGeometry();
+    pg.setAttribute('position', new THREE.BufferAttribute(posz, 3));
+    pg.setAttribute('aRnd', new THREE.BufferAttribute(rnds, 1));
+    C.posAttr = pg.attributes.position;
+    ptsMat = new THREE.ShaderMaterial({
+      vertexShader: [
+        'precision highp float;',
+        'uniform float uPx;',
+        'attribute float aRnd;',
+        'varying float vSpd; varying float vRnd;',
+        'void main(){',
+        '  vSpd = position.z; vRnd = aRnd;',
+        '  gl_Position = vec4(position.xy, 0.0, 1.0);',
+        '  gl_PointSize = uPx * (0.8 + aRnd * 0.8) * (1.0 + min(position.z * 0.5, 1.5));',
+        '}'
+      ].join('\n'),
+      fragmentShader: PTS_FS,
+      transparent: true, depthWrite: false, depthTest: false,
+      blending: THREE.NormalBlending,
+      uniforms: {
+        uPx: { value: U.px * DPR },
+        uInk: { value: new THREE.Vector3(inkCol.r, inkCol.g, inkCol.b) },
+        uAlpha: { value: Math.min(U.alpha * 1.5, 0.85) }
+      }
+    });
+    var pcloud = new THREE.Points(pg, ptsMat);
+    pcloud.frustumCulled = false;
+    ptsScene = new THREE.Scene(); ptsScene.add(pcloud);
+    fadeMat = new THREE.ShaderMaterial({
+      vertexShader: QUAD_VS, fragmentShader: FADE_FS,
+      transparent: true, depthWrite: false, depthTest: false,
+      uniforms: { uPaper: { value: new THREE.Vector3(PAPER.r, PAPER.g, PAPER.b) },
+                  uFade: { value: 1 } }
+    });
+    fadeScene = quadScene(fadeMat);
+    makeTrail();
+    gpu = false;
+  }
+
+  function stepCPU(dt, t) {
+    var tA = TG[curA], tB = TG[curB];
+    var mixv = U.mix, form = U.form, flow = U.flow * 1.0;
+    var dampF = Math.pow(U.damp, dt * 60);
+    var e = 0.09, w = t * 0.22;
+    for (var i = 0; i < COUNT; i++) {
+      var px = C.px[i], py = C.py[i];
+      var rnd = C.rnd[i];
+      var fx = 0, fy = 0;
+      /* curl (sparse: every grain, small count) */
+      var nx = px * 1.35 + rnd * 6.7, ny = py * 1.35 + rnd * 6.7;
+      var a = NOISE.n3(nx, ny + e, w), b = NOISE.n3(nx, ny - e, w);
+      var c = NOISE.n3(nx + e, ny, w), d = NOISE.n3(nx - e, ny, w);
+      fx += (a - b) / (2 * e) * flow * (0.55 + 0.9 * rnd);
+      fy += (d - c) / (2 * e) * flow * (0.55 + 0.9 * rnd);
+      var i4 = i * 4;
+      var tx = tA[i4] + (tB[i4] - tA[i4]) * mixv;
+      var ty = tA[i4+1] + (tB[i4+1] - tA[i4+1]) * mixv;
+      var wg = tA[i4+2] + (tB[i4+2] - tA[i4+2]) * mixv;
+      var k = form * wg * (26 + 34 * rnd);
+      fx += (tx - px) * k; fy += (ty - py) * k;
+      var dx = px - ptr.x, dy = py - ptr.y;
+      var g = Math.exp(-(dx*dx + dy*dy) * 24);
+      var swf = Math.min(Math.sqrt(ptr.vx*ptr.vx + ptr.vy*ptr.vy) * 2, 1) * U.swirl;
+      fx += ptr.vx * g * U.brush + (-dy) * g * swf;
+      fy += ptr.vy * g * U.brush + (dx) * g * swf;
+      var gg = U.grab * 34 * Math.exp(-(dx*dx + dy*dy) * 6);
+      fx -= dx * gg; fy -= dy * gg;
+      if (U.burst > 0.001) {
+        var bx = px - burstP.x, by = py - burstP.y;
+        var bl = Math.sqrt(bx*bx + by*by) + 0.0001;
+        var bf = U.burst * Math.exp(-bl * bl * 3.2) * 95 / bl;
+        fx += bx * bf; fy += by * bf;
+      }
+      var m = 0.985;
+      if (px >  aspect * m) fx -= (px - aspect * m) * 90;
+      if (px < -aspect * m) fx -= (px + aspect * m) * 90;
+      if (py >  m) fy -= (py - m) * 90;
+      if (py < -m) fy -= (py + m) * 90;
+      var vx = (C.vx[i] + fx * dt) * dampF;
+      var vy = (C.vy[i] + fy * dt) * dampF;
+      C.vx[i] = vx; C.vy[i] = vy;
+      px += vx * dt; py += vy * dt;
+      C.px[i] = px; C.py[i] = py;
+      var ar = C.posAttr.array, i3 = i * 3;
+      ar[i3] = px / aspect; ar[i3+1] = py;
+      ar[i3+2] = Math.sqrt(vx*vx + vy*vy);
+    }
+    C.posAttr.needsUpdate = true;
+  }
+
+  /* ---------- shared per-frame ---------- */
+  function step(dt, t) {
+    if (gpu) {
+      var u = simMat.uniforms;
+      u.uDt.value = Math.min(dt, 0.033);
+      u.uTime.value = t;
+      u.uDampF.value = Math.pow(U.damp, dt * 60);
+      u.uMix.value = U.mix; u.uForm.value = U.form;
+      u.uFlow.value = U.flow; u.uBrush.value = U.brush;
+      u.uSwirl.value = U.swirl; u.uGrab.value = U.grab;
+      u.uBurst.value = U.burst;
+      u.uPtr.value.set(ptr.x, ptr.y);
+      u.uPtrVel.value.set(ptr.vx, ptr.vy);
+      u.uBurstP.value.set(burstP.x, burstP.y);
+      var src = cur === 0 ? rtA : rtB;
+      var dst = cur === 0 ? rtB : rtA;
+      u.uState.value = src.texture;
+      renderer.setRenderTarget(dst);
+      renderer.render(simScene, camera2);
+      cur = 1 - cur;
+      ptsMat.uniforms.uState.value = dst.texture;
+    } else {
+      stepCPU(dt, t);
+    }
+    /* trail: fade toward paper, then stamp grains */
+    fadeMat.uniforms.uFade.value = U.fade;
+    renderer.setRenderTarget(trail);
+    renderer.render(fadeScene, camera2);
+    renderer.render(ptsScene, camera2);
+    /* display */
+    renderer.setRenderTarget(null);
+    renderer.render(dispScene, camera2);
+  }
+
+  /* ---------- target choreography ---------- */
+  var mixTween = null;
+  function toTarget(name, form, dur, ease) {
+    if (!TG[name]) name = 'free';
+    if (mixTween) mixTween.kill();
+    /* collapse current blend into A, aim B at the new target */
+    var eff = collapseInto();
+    if (gpu) uploadTarget(texB, name); 
+    curB = name;
+    mixTween = gsap.timeline();
+    mixTween.to(U, { mix: 1, duration: dur || 1.6, ease: ease || 'sine.inOut' }, 0);
+    mixTween.to(U, { form: form, duration: dur || 1.6, ease: 'sine.inOut' }, 0);
+    mixTween.add(function () {
+      if (gpu) uploadTarget(texA, name);
+      curA = name; U.mix = 0;
+      if (!gpu) { curA = name; }
+    });
+  }
+  function collapseInto() {
+    /* cheap approximation: if mid-blend, promote B to A first */
+    if (U.mix > 0.5) { if (gpu) uploadTarget(texA, curB); curA = curB; }
+    U.mix = 0;
+    if (gpu) uploadTarget(texB, curB);
+    return curA;
+  }
+
+  function setInk(hex) {
+    var c = new THREE.Color(hex);
+    gsap.to(ptsMat.uniforms.uInk.value, { x: c.r, y: c.g, z: c.b,
+      duration: 0.9, ease: 'sine.inOut' });
+  }
+
+  function burst(sx, sy, power) {
+    burstP.x = sx; burstP.y = sy;
+    U.burst = power;
+    gsap.to(U, { burst: 0, duration: 0.75, ease: 'power3.out', overwrite: 'auto' });
+  }
+
+  function pointerSim(px, py, pvx, pvy) {
+    ptr.x = px; ptr.y = py; ptr.vx = pvx; ptr.vy = pvy;
+  }
+
+  function resize() {
+    aspect = window.innerWidth / window.innerHeight;
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    if (gpu) simMat.uniforms.uAspect.value = aspect;
+    if (gpu) ptsMat.uniforms.uAspect.value = aspect;
+    bakeTargets();
+    if (gpu) { uploadTarget(texA, curA); uploadTarget(texB, curB); }
+    makeTrail();
+  }
+
+  /* ---------- boot ---------- */
+  var ok = true;
+  try {
+    if (floatRTWorks()) initGPU(); else initCPU();
+    makeDisplay();
+  } catch (e) {
+    try { initCPU(); makeDisplay(); } catch (e2) { ok = false; }
+  }
+
+  return {
+    ok: ok, gpu: gpu, count: COUNT, U: U,
+    step: step, toTarget: toTarget, setInk: setInk,
+    burst: burst, pointer: pointerSim, resize: resize,
+    rebakeType: function () { bakeTargets();
+      if (gpu) { uploadTarget(texA, curA); uploadTarget(texB, curB); } },
+    getAspect: function () { return aspect; }
+  };
+})();
+
+if (!INK.ok) {
+  document.getElementById('nogl').style.display = 'flex';
+  document.getElementById('veil').style.display = 'none';
+  docEl.classList.remove('booting');
+  return;
+}
+
+/* ==================================================================
+   INPUT — pointer → sim space, brush velocity, hold-to-gather
+   ================================================================== */
+var PTR = { x: 0, y: 0, sx: 0, sy: 0, pvx: 0, pvy: 0,
+            down: false, downT: 0, held: 0 };
+function toSim(cx, cy) {
+  var a = INK.getAspect();
+  return [ (cx / window.innerWidth * 2 - 1) * a,
+           -(cy / window.innerHeight * 2 - 1) ];
+}
+var curState = { hov: false, cx: innerWidth / 2, cy: innerHeight / 2 };
+window.addEventListener('pointermove', function (e) {
+  var s = toSim(e.clientX, e.clientY);
+  PTR.x = s[0]; PTR.y = s[1];
+  curState.cx = e.clientX; curState.cy = e.clientY;
+}, { passive: true });
+
+function interactiveHit(t) {
+  return t && t.closest && t.closest('a, button, input, #blot, #soft-lab, #rope-lab');
+}
+window.addEventListener('pointerdown', function (e) {
+  curState.cx = e.clientX; curState.cy = e.clientY;
+  var s = toSim(e.clientX, e.clientY);
+  PTR.x = s[0]; PTR.y = s[1];
+  if (!FINE) return;
+  if (interactiveHit(e.target)) return;
+  PTR.down = true; PTR.downT = performance.now();
+  gsap.killTweensOf(INK.U, 'grab');
+  gsap.to(INK.U, { grab: 1, duration: 0.5, ease: 'power2.out' });
+});
+window.addEventListener('pointerup', function (e) {
+  if (!PTR.down) return;
+  PTR.down = false;
+  var held = (performance.now() - PTR.downT) / 1000;
+  gsap.killTweensOf(INK.U, 'grab');
+  gsap.to(INK.U, { grab: 0, duration: 0.22, ease: 'power2.out' });
+  var s = toSim(e.clientX, e.clientY);
+  INK.burst(s[0], s[1], clamp(0.3 + held * 0.9, 0.3, 1.25));
+  gsap.fromTo('#cur', { scale: 1.7 }, { scale: 1, duration: 0.7, ease: 'elastic.out(1,0.4)' });
+});
+window.addEventListener('blur', function () {
+  PTR.down = false;
+  gsap.to(INK.U, { grab: 0, duration: 0.2 });
+});
+window.addEventListener('keydown', function (e) {
+  var ae = document.activeElement;
+  if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'BUTTON' || ae.tagName === 'A')) return;
+  if (e.key === ' ') {
+    e.preventDefault();
+    INK.burst(PTR.x, PTR.y, 1.0);
+  } else if (e.key === 'i') {
+    document.getElementById('inkbtn').click();
+  }
+});
+
+/* ---------- scroll velocity (drives marquee skew + liquid type) ---------- */
+var scrollV = { raw: 0, s: 0, last: window.scrollY || 0 };
+
+/* ==================================================================
+   MARQUEE — velocity-reactive strip
+   ================================================================== */
+(function buildMarquee() {
+  var track = document.getElementById('marq-track');
+  var items = [['流', 'FLUID'], ['弾', 'ELASTIC'], ['柔', 'SOFT'],
+               ['重', 'WEIGHT'], ['墨', 'INK'], ['流', 'MORPH']];
+  var setHtml = items.map(function (it) {
+    return '<span class="k">' + it[0] + '</span><span class="w">' + it[1] +
+           '</span><span class="dot"></span>';
+  }).join('');
+  var one = '<div class="set">' + setHtml + '</div>';
+  track.innerHTML = one + one + one + one;
+  if (RM) return;
+  var tw = gsap.to(track, { xPercent: -50, repeat: -1, ease: 'none', duration: 30 });
+  gsap.ticker.add(function () {
+    var v = clamp(Math.abs(scrollV.s) / 800, 0, 2.4);
+    tw.timeScale(1 + v * 2.2);
+    gsap.set(track, { skewX: clamp(scrollV.s * 0.004, -10, 10) });
+  });
+})();
+
+/* ==================================================================
+   ELASTIC — liquid displacement type + letter springs
+   ================================================================== */
+function splitChars(el, text) {
+  el.textContent = '';
+  var frag = document.createDocumentFragment();
+  for (var i = 0; i < text.length; i++) {
+    var s = document.createElement('span');
+    s.className = 'ch';
+    s.textContent = text[i] === ' ' ? '\u00A0' : text[i];
+    frag.appendChild(s);
+  }
+  el.appendChild(frag);
+}
+var LIQ = (function () {
+  var word = document.getElementById('eword');
+  var disp = document.getElementById('liq-disp');
+  var turb = document.getElementById('liq-turb');
+  splitChars(word, 'ELASTIC');
+  var v = 0, frame = 0;
+  if (HAS_ANIME && !RM) {
+    word.addEventListener('pointerover', function (e) {
+      var ch = e.target.closest('.ch');
+      if (!ch) return;
+      anime.remove(ch);
+      anime({ targets: ch, keyframes: [
+        { translateY: -16, scaleY: 1.06, duration: 110, easing: 'easeOutCubic' },
+        { translateY: 0, scaleY: 1, duration: 800, easing: 'spring(1, 80, 9, 0)' }
+      ]});
+    });
+  }
+  function step(t, dt) {
+    if (RM) return;
+    var r = word.getBoundingClientRect();
+    if (r.bottom < -80 || r.top > innerHeight + 80) {
+      if (v > 0.5) { v = 0; disp.setAttribute('scale', 0); }
+      return;
+    }
+    var mx = r.left + r.width / 2, my = r.top + r.height / 2;
+    var dx = (curState.cx - mx) / (r.width * 0.62);
+    var dy = (curState.cy - my) / (r.height * 0.9);
+    var prox = Math.exp(-(dx * dx + dy * dy) * 1.6);
+    var target = 4 + prox * 30 + clamp(Math.abs(scrollV.s) * 0.02, 0, 26);
+    v = lerp(v, target, 1 - Math.pow(0.002, dt));
+    frame++;
+    if (frame % 2 === 0) {
+      disp.setAttribute('scale', v.toFixed(1));
+      var bf = 0.011 + 0.0035 * Math.sin(t * 0.8);
+      turb.setAttribute('baseFrequency', bf.toFixed(4) + ' ' + (bf * 1.5).toFixed(4));
+    }
+  }
+  return { step: step };
+})();
+
+/* ==================================================================
+   BLOT — flubber-style silhouette morphs
+   ================================================================== */
+var BLOT = (function () {
+  var svg = document.getElementById('blot');
+  var path = document.getElementById('blot-path');
+  var nameEl = document.getElementById('blotname');
+  var M = 140, CX = 160, CY = 160, R = 100;
+  function polar(fn) {
+    var pts = [];
+    for (var i = 0; i < 160; i++) {
+      var a = (i / 160) * TAU;
+      var r = fn(a);
+      pts.push(CX + Math.cos(a) * r, CY + Math.sin(a) * r);
+    }
+    return MORPH.resample(pts, M);
+  }
+  var SH = [
+    { n: 'blot', p: polar(function (a) {
+        return R * (0.94 + 0.15 * Math.sin(3 * a + 1.2) + 0.09 * Math.sin(5 * a - 0.4)
+               + 0.05 * Math.sin(8 * a + 2.0)); }) },
+    { n: 'splat', p: polar(function (a) {
+        return R * (0.55 + 0.42 * Math.pow(Math.abs(Math.sin(5.5 * a + 0.9)), 1.5)
+               + 0.09 * Math.sin(11 * a)); }) },
+    { n: 'drop', p: (function () {
+        var pts = [];
+        for (var i = 0; i < 160; i++) {
+          var t = (i / 160) * TAU;
+          var x = Math.sin(t) * Math.pow(Math.abs(Math.sin(t / 2)), 0.72) * R * 0.82;
+          var y = -Math.cos(t) * R * 1.02;
+          pts.push(CX + x, CY + y + 6);
+        }
+        return MORPH.resample(pts, M);
+      })() },
+    { n: 'stone', p: polar(function (a) {
+        var n = 3.2;
+        var c = Math.pow(Math.abs(Math.cos(a)), n) + Math.pow(Math.abs(Math.sin(a) * 1.28), n);
+        return R * 0.95 * Math.pow(c, -1 / n); }) }
+  ];
+  var idx = 0;
+  var curPts = new Float32Array(SH[0].p);
+  var fromPts = new Float32Array(M * 2);
+  var mm = { t: 1 };
+  path.setAttribute('d', MORPH.toPath(curPts));
+  function label() {
+    nameEl.textContent = SH[idx].n + ' \u00b7 0' + (idx + 1);
+    if (HAS_ANIME && !RM) {
+      anime({ targets: nameEl, translateY: [8, 0], opacity: [0, 1],
+        duration: 420, easing: 'easeOutExpo' });
+    }
+  }
+  function go() {
+    idx = (idx + 1) % SH.length;
+    fromPts.set(curPts);
+    var target = SH[idx].p;
+    gsap.killTweensOf(mm);
+    mm.t = 0;
+    gsap.to(mm, {
+      t: 1, duration: RM ? 0 : 1.2, ease: 'elastic.out(1, 0.36)',
+      onUpdate: function () {
+        MORPH.mix(fromPts, target, mm.t, curPts);
+        path.setAttribute('d', MORPH.toPath(curPts));
+      }
+    });
+    label();
+  }
+  svg.addEventListener('click', go);
+  svg.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
+  });
+  label();
+  return { setInk: function (hex) { path.style.fill = hex; } };
+})();
+
+/* ==================================================================
+   SOFT — Matter.js jelly tray under a metaball threshold
+   ================================================================== */
+var SOFT = (function () {
+  if (!HAS_MATTER) return null;
+  var Engine = Matter.Engine, Bodies = Matter.Bodies, Body = Matter.Body,
+      Composite = Matter.Composite, Constraint = Matter.Constraint,
+      Mouse = Matter.Mouse, MouseConstraint = Matter.MouseConstraint;
+  var canvas = document.getElementById('soft-canvas');
+  var lab = document.getElementById('soft-lab');
+  var engine = null, ctx = null, balls = [], jelly = [], walls = [];
+  var built = false, active = false, gsign = 1;
+  var inkHex = PIGMENTS[0].hex;
+
+  function size() {
+    canvas.width = lab.clientWidth;
+    canvas.height = lab.clientHeight;
+  }
+  function shades() {
+    return [inkHex, '#27364b', '#454f5b'];
+  }
+  function makeWalls() {
+    var w = canvas.width, h = canvas.height, T = 160;
+    walls.forEach(function (wl) { Composite.remove(engine.world, wl); });
+    walls = [
+      Bodies.rectangle(w / 2, h + T / 2, w * 3, T, { isStatic: true }),
+      Bodies.rectangle(w / 2, -T / 2, w * 3, T, { isStatic: true }),
+      Bodies.rectangle(-T / 2, h / 2, T, h * 3, { isStatic: true }),
+      Bodies.rectangle(w + T / 2, h / 2, T, h * 3, { isStatic: true })
+    ];
+    Composite.add(engine.world, walls);
+  }
+  function build() {
+    size();
+    ctx = canvas.getContext('2d');
+    engine = Engine.create();
+    engine.gravity.y = 1;
+    engine.positionIterations = 8;
+    engine.velocityIterations = 6;
+    var w = canvas.width, h = canvas.height;
+    var cols = shades();
+    var count = w < 620 ? 16 : 24;
+    for (var i = 0; i < count; i++) {
+      var r = rand(10, 26);
+      var b = Bodies.circle(rand(r, w - r), rand(20, h * 0.5), r, {
+        restitution: 0.82, friction: 0.03, frictionAir: 0.014
+      });
+      b._col = cols[i % 3]; b._r = r;
+      balls.push(b);
+    }
+    /* the vermillion seal-drop — always exactly one */
+    var seal = Bodies.circle(w * 0.72, 30, 15, {
+      restitution: 0.9, friction: 0.03, frictionAir: 0.012 });
+    seal._col = '#c63a1e'; seal._r = 15; seal._seal = true;
+    balls.push(seal);
+
+    /* hand-built soft body: 4×4 lattice with structural + shear springs */
+    var JC = 4, JR = 4, SPC = 30, jr = 9;
+    var ox = w * 0.5 - (JC - 1) * SPC * 0.5, oy = h * 0.24;
+    var grid = [];
+    for (var gy = 0; gy < JR; gy++) {
+      for (var gx = 0; gx < JC; gx++) {
+        var jb = Bodies.circle(ox + gx * SPC, oy + gy * SPC, jr, {
+          restitution: 0.35, friction: 0.06, frictionAir: 0.032
+        });
+        jb._col = inkHex; jb._r = jr + 6; jb._jelly = true;
+        grid.push(jb); jelly.push(jb);
+      }
+    }
+    var cons = [];
+    function link(a, b, st) {
+      cons.push(Constraint.create({ bodyA: a, bodyB: b, stiffness: st, damping: 0.09 }));
+    }
+    for (var y2 = 0; y2 < JR; y2++) {
+      for (var x2 = 0; x2 < JC; x2++) {
+        var id = y2 * JC + x2;
+        if (x2 < JC - 1) link(grid[id], grid[id + 1], 0.06);
+        if (y2 < JR - 1) link(grid[id], grid[id + JC], 0.06);
+        if (x2 < JC - 1 && y2 < JR - 1) {
+          link(grid[id], grid[id + JC + 1], 0.03);
+          link(grid[id + 1], grid[id + JC], 0.03);
+        }
+      }
+    }
+    makeWalls();
+    Composite.add(engine.world, balls);
+    Composite.add(engine.world, jelly);
+    Composite.add(engine.world, cons);
+    var mouse = Mouse.create(canvas);
+    var mc = MouseConstraint.create(engine, {
+      mouse: mouse,
+      constraint: { stiffness: 0.14, damping: 0.12, render: { visible: false } }
+    });
+    Composite.add(engine.world, mc);
+    built = true;
+  }
+  function step(dtms) {
+    if (!built || !active) return;
+    Engine.update(engine, clamp(dtms, 4, 33));
+    var w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    var all = balls.concat(jelly);
+    for (var i = 0; i < all.length; i++) {
+      var b = all[i];
+      if (b.position.y > h + 300 || b.position.y < -300 ||
+          b.position.x < -300 || b.position.x > w + 300) {
+        Body.setPosition(b, { x: rand(40, w - 40), y: h * 0.3 });
+        Body.setVelocity(b, { x: 0, y: 0 });
+      }
+      ctx.fillStyle = b._col;
+      ctx.beginPath();
+      ctx.arc(b.position.x, b.position.y, b._r, 0, TAU);
+      ctx.fill();
+    }
+  }
+  return {
+    ensure: function () { if (!built) build(); },
+    setActive: function (b) { active = b; if (b) this.ensure(); },
+    step: step,
+    resize: function () { if (!built) return; size(); makeWalls(); },
+    recolor: function (hex) {
+      inkHex = hex;
+      if (!built) return;
+      var cols = shades();
+      balls.forEach(function (b, i) { if (!b._seal) b._col = cols[i % 3]; });
+      jelly.forEach(function (b) { b._col = hex; });
+    },
+    flip: function () {
+      if (!engine) return;
+      gsign *= -1;
+      engine.gravity.y = gsign;
+      gsap.fromTo(canvas, { y: gsign * -6 }, { y: 0, duration: 0.7, ease: 'elastic.out(1.1,0.35)' });
+    },
+    disturb: function () {
+      if (!built) return;
+      balls.concat(jelly).forEach(function (b) {
+        Body.applyForce(b, b.position, {
+          x: rand(-0.05, 0.05) * b.mass,
+          y: rand(-0.09, -0.015) * b.mass * gsign
+        });
+      });
+      gsap.fromTo(canvas, { x: -5 }, { x: 0, duration: 0.55, ease: 'elastic.out(1.2,0.3)' });
+    }
+  };
+})();
+if (SOFT) {
+  document.getElementById('b-disturb').addEventListener('click', function () { SOFT.disturb(); });
+  document.getElementById('b-flip').addEventListener('click', function () { SOFT.flip(); });
+} else {
+  document.getElementById('soft-lab').style.display = 'none';
+}
+
+/* ==================================================================
+   ROPE — Verlet strands with heavy ink bobs
+   ================================================================== */
+var ROPE = (function () {
+  var canvas = document.getElementById('rope-canvas');
+  var lab = document.getElementById('rope-lab');
+  var ctx = null, ropes = [], built = false, active = false;
+  var W = 0, H = 0, DPR2 = Math.min(window.devicePixelRatio || 1, 2);
+  var grabbed = null;
+  var inkHex = PIGMENTS[0].hex;
+
+  function size() {
+    W = lab.clientWidth; H = lab.clientHeight;
+    canvas.width = W * DPR2; canvas.height = H * DPR2;
+    ctx = canvas.getContext('2d');
+    ctx.setTransform(DPR2, 0, 0, DPR2, 0, 0);
+  }
+  function makeRope(fx, segs, bobR, mass) {
+    var len = (H * 0.58) / segs;
+    var pts = [];
+    for (var i = 0; i <= segs; i++) {
+      pts.push({ x: fx + i * 2, y: 12 + i * len, ox: fx + i * 2, oy: 12 + i * len });
+    }
+    return { pts: pts, segs: segs, len: len, ax: fx, bobR: bobR, mass: mass, seed: Math.random() * 40 };
+  }
+  function build() {
+    size();
+    ropes = [
+      makeRope(W * 0.26, 22, 12, 0.7),
+      makeRope(W * 0.5, 26, 26, 2.6),
+      makeRope(W * 0.74, 24, 17, 1.3)
+    ];
+    built = true;
+  }
+  function step(dt, t) {
+    if (!built || !active) return;
+    dt = clamp(dt, 0.004, 0.024);
+    var g = 980, dt2 = dt * dt;
+    var r, p, i, j;
+    for (r = 0; r < ropes.length; r++) {
+      var R2 = ropes[r], pts = R2.pts, n = pts.length;
+      for (i = 1; i < n; i++) {
+        p = pts[i];
+        var isBob = (i === n - 1);
+        var m = isBob ? R2.mass : 0.35;
+        var wind = NOISE.n3(p.x * 0.008, t * 0.45, R2.seed) * (isBob ? 26 / m : 40);
+        var nx = p.x + (p.x - p.ox) * 0.988 + wind * dt2;
+        var ny = p.y + (p.y - p.oy) * 0.988 + g * dt2;
+        p.ox = p.x; p.oy = p.y;
+        p.x = nx; p.y = ny;
+      }
+      /* pointer-pinned bob */
+      if (grabbed && grabbed.rope === R2) {
+        var bp = pts[n - 1];
+        bp.ox = lerp(bp.ox, grabbed.x, 0.4);
+        bp.oy = lerp(bp.oy, grabbed.y, 0.4);
+        bp.x = grabbed.x; bp.y = grabbed.y;
+      }
+      /* constraints */
+      for (j = 0; j < 12; j++) {
+        pts[0].x = R2.ax; pts[0].y = 12;
+        for (i = 0; i < n - 1; i++) {
+          var a = pts[i], b = pts[i + 1];
+          var dx = b.x - a.x, dy = b.y - a.y;
+          var d = Math.sqrt(dx * dx + dy * dy) || 0.0001;
+          var diff = (d - R2.len) / d;
+          var wA = (i === 0) ? 0 : 0.5;
+          var wB = (i + 1 === n - 1) ? (grabbed && grabbed.rope === R2 ? 0 : 0.72) : 0.5;
+          var sw = wA + wB || 1;
+          a.x += dx * diff * (wA / sw); a.y += dy * diff * (wA / sw);
+          b.x -= dx * diff * (wB / sw); b.y -= dy * diff * (wB / sw);
+        }
+      }
+      /* keep the bob on the tray */
+      var bob = pts[n - 1], br = R2.bobR;
+      if (bob.y > H - br) { bob.y = H - br; bob.oy = bob.y + (bob.y - bob.oy) * 0.45; }
+      if (bob.x < br) { bob.x = br; bob.ox = bob.x + (bob.x - bob.ox) * 0.45; }
+      if (bob.x > W - br) { bob.x = W - br; bob.ox = bob.x + (bob.x - bob.ox) * 0.45; }
+    }
+    draw();
+  }
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    for (var r = 0; r < ropes.length; r++) {
+      var R2 = ropes[r], pts = R2.pts, n = pts.length;
+      ctx.strokeStyle = inkHex;
+      ctx.lineCap = 'round';
+      for (var i = 0; i < n - 1; i++) {
+        var a = pts[i], b = pts[i + 1];
+        ctx.lineWidth = 4.6 - (i / n) * 2.8;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        ctx.quadraticCurveTo(a.x, a.y, mx, my);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      }
+      var bob = pts[n - 1];
+      ctx.fillStyle = inkHex;
+      ctx.beginPath();
+      ctx.arc(bob.x, bob.y, R2.bobR, 0, TAU);
+      ctx.fill();
+      if (R2.mass > 2) {          /* the heavy one wears the seal */
+        ctx.fillStyle = '#c63a1e';
+        ctx.beginPath();
+        ctx.arc(bob.x, bob.y, 4.5, 0, TAU);
+        ctx.fill();
+      }
+    }
+  }
+  function local(e) {
+    var r = canvas.getBoundingClientRect();
+    return [e.clientX - r.left, e.clientY - r.top];
+  }
+  canvas.addEventListener('pointerdown', function (e) {
+    if (!built) return;
+    var xy = local(e);
+    for (var r = 0; r < ropes.length; r++) {
+      var bob = ropes[r].pts[ropes[r].pts.length - 1];
+      if (Math.hypot(xy[0] - bob.x, xy[1] - bob.y) < ropes[r].bobR + 16) {
+        grabbed = { rope: ropes[r], x: xy[0], y: xy[1] };
+        canvas.setPointerCapture(e.pointerId);
+        e.preventDefault();
+        break;
+      }
+    }
+  });
+  canvas.addEventListener('pointermove', function (e) {
+    if (!grabbed) return;
+    var xy = local(e);
+    grabbed.x = clamp(xy[0], 8, W - 8);
+    grabbed.y = clamp(xy[1], 8, H - 8);
+  });
+  window.addEventListener('pointerup', function () { grabbed = null; });
+  return {
+    ensure: function () { if (!built) build(); },
+    setActive: function (b) { active = b; if (b) this.ensure(); },
+    step: step,
+    resize: function () { if (built) build(); },
+    setInk: function (hex) { inkHex = hex; }
+  };
+})();
+
+/* ==================================================================
+   CURSOR — gel dot: squash-and-stretch along velocity
+   ================================================================== */
+var CUR = (function () {
+  if (!FINE) return null;
+  var ring = document.getElementById('cur');
+  var dot = document.getElementById('curdot');
+  var st = { x: innerWidth / 2, y: innerHeight / 2, vx: 0, vy: 0 };
+  document.addEventListener('pointerover', function (e) {
+    var hit = e.target.closest && e.target.closest('a, button, #blot, .btn, #inkbtn');
+    ring.classList.toggle('hov', !!hit);
+  });
+  function frame(dt) {
+    var kS = 210, cS = 17;
+    st.vx += (curState.cx - st.x) * kS * dt; st.vx *= Math.exp(-cS * dt);
+    st.vy += (curState.cy - st.y) * kS * dt; st.vy *= Math.exp(-cS * dt);
+    st.x += st.vx * dt; st.y += st.vy * dt;
+    var sp = Math.hypot(st.vx, st.vy);
+    var stretch = 1 + Math.min(sp * 0.00075, 0.75);
+    var ang = Math.atan2(st.vy, st.vx);
+    var grab = INK.U.grab;
+    var base = 1 + grab * 0.9;
+    ring.style.transform = 'translate(' + st.x + 'px,' + st.y + 'px) rotate(' + ang +
+      'rad) scale(' + (stretch * base) + ',' + (base / Math.sqrt(stretch)) + ')';
+    dot.style.transform = 'translate(' + curState.cx + 'px,' + curState.cy + 'px)';
+  }
+  return { frame: frame };
+})();
+
+/* ---------- ink toggle ---------- */
+var inkBtn = document.getElementById('inkbtn');
+var inkName = document.getElementById('inkname');
+inkBtn.addEventListener('click', function () {
+  pig = (pig + 1) % PIGMENTS.length;
+  var p = PIGMENTS[pig];
+  inkName.textContent = p.name;
+  INK.setInk(p.hex);
+  BLOT.setInk(p.hex);
+  ROPE.setInk(p.hex);
+  if (SOFT) SOFT.recolor(p.hex);
+  if (HAS_ANIME && !RM) {
+    anime({ targets: inkBtn, scale: [0.93, 1], duration: 420, easing: 'spring(1, 100, 11, 0)' });
+  }
+});
+
+/* ==================================================================
+   MACHINE — veil → live
+   ================================================================== */
+var machine = createMachine({
+  initial: 'veil',
+  states: {
+    veil: { on: { READY: 'live' } },
+    live: {
+      entry: function () {
+        docEl.classList.remove('booting');
+        if (HAS_ANIME && !RM) {
+          document.querySelectorAll('[data-ui]').forEach(function (el) { el.style.opacity = 0; });
+          anime({ targets: '[data-ui]', translateY: [10, 0], opacity: [0, 1],
+            duration: 800, delay: anime.stagger(90, { start: 60 }), easing: 'easeOutCubic' });
+        } else {
+          document.querySelectorAll('[data-ui]').forEach(function (el) { el.style.opacity = 1; });
+        }
+      }
+    }
+  }
+});
+
+/* ==================================================================
+   CHOREOGRAPHY — hero scrub, scene targets, reveals, rail
+   ================================================================== */
+var bootF = { v: 0 };
+var heroPr = { v: 0 };
+var heroActive = true;
+function heroFall(r) {
+  if (r <= 0.40) return 1;
+  if (r >= 0.94) return 0;
+  var t = (r - 0.40) / 0.54;
+  return 1 - t * t * (3 - 2 * t);
+}
+
+function sceneApply(name, form, flow, fade) {
+  INK.toTarget(name, form, 1.7);
+  gsap.to(INK.U, { flow: flow, fade: fade, duration: 1.5, ease: 'sine.inOut', overwrite: 'auto' });
+}
+
+if (HAS_ST) {
+  gsap.to(heroPr, {
+    v: 1, ease: 'none',
+    scrollTrigger: {
+      trigger: '#hero', start: 'top top', end: 'bottom bottom',
+      scrub: RM ? true : 0.85, pin: '.hero-pin', pinSpacing: false,
+      onLeave: function () { heroActive = false; sceneApply('free', 0, 1.4, 0.045); },
+      onEnterBack: function () { heroActive = true; INK.toTarget('word', 1, 1.1); },
+      onLeaveBack: function () { heroActive = true; }
+    }
+  });
+
+  var SCENES = [
+    ['#s-flow',    'free',  0,    1.4,  0.045],
+    ['#s-elastic', 'free',  0,    0.8,  0.06 ],
+    ['#s-soft',    'enso',  0.6,  0.5,  0.07 ],
+    ['#s-weight',  'waves', 0.55, 0.6,  0.06 ],
+    ['#end',       'ku',    0.85, 0.35, 0.05 ]
+  ];
+  SCENES.forEach(function (S) {
+    ScrollTrigger.create({
+      trigger: S[0], start: 'top 60%', end: 'bottom 40%',
+      onEnter: function () { if (!heroActive || S[0] !== '#s-flow') sceneApply(S[1], S[2], S[3], S[4]); },
+      onEnterBack: function () { sceneApply(S[1], S[2], S[3], S[4]); }
+    });
+  });
+
+  /* reveals */
+  gsap.utils.toArray('[data-rev]').forEach(function (el) {
+    if (RM) return;
+    gsap.fromTo(el, { y: 34, opacity: 0 }, {
+      y: 0, opacity: 1, duration: 1.05, ease: 'power3.out',
+      scrollTrigger: { trigger: el, start: 'top 84%', once: true }
+    });
+  });
+
+  /* ghost kanji parallax */
+  gsap.utils.toArray('.ghost').forEach(function (el) {
+    gsap.fromTo(el, { yPercent: -12 }, { yPercent: 14, ease: 'none',
+      scrollTrigger: { trigger: el.parentElement, start: 'top bottom', end: 'bottom top', scrub: true } });
+  });
+
+  /* rail live state */
+  ['hero', 's-flow', 's-elastic', 's-soft', 's-weight'].forEach(function (id) {
+    var link = document.querySelector('#rail a[data-sec="' + id + '"]');
+    if (!link) return;
+    ScrollTrigger.create({
+      trigger: '#' + id, start: 'top 55%', end: 'bottom 45%',
+      onToggle: function (self) { link.classList.toggle('live', self.isActive); }
+    });
+  });
+
+  /* labs only run while on screen */
+  if (SOFT) ScrollTrigger.create({
+    trigger: '#soft-lab', start: 'top 92%', end: 'bottom 8%',
+    onToggle: function (self) { SOFT.setActive(self.isActive); }
+  });
+  ScrollTrigger.create({
+    trigger: '#rope-lab', start: 'top 92%', end: 'bottom 8%',
+    onToggle: function (self) { ROPE.setActive(self.isActive); }
+  });
+
+  /* status line retires after the first stroke of scroll */
+  ScrollTrigger.create({
+    start: 80, end: 'max',
+    onToggle: function (self) {
+      gsap.to('#status', { autoAlpha: self.isActive ? 0 : 1, duration: 0.5 });
+    }
+  });
+} else {
+  /* graceful degrade: IntersectionObserver drives everything */
+  document.querySelector('.hero-pin').parentElement.style.height = '100vh';
+  heroActive = false;
+  var IO = ('IntersectionObserver' in window) ? new IntersectionObserver(function (es) {
+    es.forEach(function (en) {
+      if (!en.isIntersecting) return;
+      var id = en.target.id;
+      if (id === 's-soft' && SOFT) { SOFT.setActive(true); sceneApply('enso', 0.6, 0.5, 0.07); }
+      else if (id === 's-weight') { ROPE.setActive(true); sceneApply('waves', 0.55, 0.6, 0.06); }
+      else if (id === 's-flow') sceneApply('free', 0, 1.4, 0.045);
+      else if (id === 'end') sceneApply('ku', 0.85, 0.35, 0.05);
+      en.target.querySelectorAll('[data-rev]').forEach(function (el) { el.style.opacity = 1; });
+    });
+  }, { threshold: 0.25 }) : null;
+  if (IO) ['s-flow', 's-elastic', 's-soft', 's-weight', 'end'].forEach(function (id) {
+    var el = document.getElementById(id); if (el) IO.observe(el);
+  });
+  document.querySelectorAll('[data-rev]').forEach(function (el) { el.style.opacity = 1; });
+}
+
+/* rail links + return button */
+document.querySelectorAll('#rail a').forEach(function (a) {
+  a.addEventListener('click', function (e) {
+    e.preventDefault();
+    var el = document.querySelector(a.getAttribute('href'));
+    if (el) window.scrollTo({ top: el.offsetTop, behavior: RM ? 'auto' : 'smooth' });
+  });
+});
+var topBtn = document.getElementById('top');
+topBtn.addEventListener('click', function () {
+  window.scrollTo({ top: 0, behavior: RM ? 'auto' : 'smooth' });
+});
+/* magnetic pull on the return button */
+if (FINE && !RM) (function () {
+  var qx = gsap.quickTo(topBtn, 'x', { duration: 0.5, ease: 'power3.out' });
+  var qy = gsap.quickTo(topBtn, 'y', { duration: 0.5, ease: 'power3.out' });
+  window.addEventListener('pointermove', function (e) {
+    var r = topBtn.getBoundingClientRect();
+    var mx = r.left + r.width / 2, my = r.top + r.height / 2;
+    var dx = e.clientX - mx, dy = e.clientY - my;
+    var d = Math.hypot(dx, dy);
+    if (d < 130) { qx(dx * 0.32); qy(dy * 0.32); }
+    else { qx(0); qy(0); }
+  }, { passive: true });
+})();
+
+/* ==================================================================
+   VEIL — the first drop of ink
+   ================================================================== */
+function pad3(n) { return ('00' + n).slice(-3); }
+function runVeil() {
+  var veil = document.getElementById('veil');
+  var path = document.getElementById('veil-drop');
+  var countEl = document.getElementById('count');
+  var M = 140;
+  var circlePts = (function () {
+    var pts = [];
+    for (var i = 0; i < 120; i++) {
+      var a = (i / 120) * TAU;
+      pts.push(80 + Math.cos(a) * 15, 80 + Math.sin(a) * 15);
+    }
+    return MORPH.resample(pts, M);
+  })();
+  var splatPts = (function () {
+    var pts = [];
+    for (var i = 0; i < 160; i++) {
+      var a = (i / 160) * TAU;
+      var r = 34 * (0.6 + 0.4 * Math.pow(Math.abs(Math.sin(5 * a + 0.7)), 1.4)
+              + 0.09 * Math.sin(11 * a + 2.0));
+      pts.push(80 + Math.cos(a) * r, 80 + Math.sin(a) * r * 0.82);
+    }
+    return MORPH.resample(pts, M);
+  })();
+  var cur = new Float32Array(circlePts);
+  path.setAttribute('d', MORPH.toPath(cur));
+
+  var finish = function () {
+    veil.style.display = 'none';
+    machine.send('READY');
+  };
+  if (RM || !window.gsap) {
+    gsap.to(INK.U, { form: 1, duration: 0.01 });
+    bootF.v = 1;
+    gsap.to(veil, { autoAlpha: 0, duration: 0.4, onComplete: finish });
+    return;
+  }
+  var cnt = { n: 0 };
+  var mm = { t: 0 };
+  var tl = gsap.timeline();
+  tl.to(cnt, { n: 100, duration: 1.55, ease: 'power2.inOut',
+    onUpdate: function () { countEl.textContent = pad3(Math.round(cnt.n)); } }, 0);
+  /* the word assembles behind the veil */
+  tl.to(bootF, { v: 1, duration: 2.1, ease: 'expo.out' }, 0.35);
+  /* drop falls */
+  tl.fromTo(path, { y: -62 }, { y: 0, duration: 0.72, ease: 'power2.in' }, 0.15);
+  /* impact: squash, then elastic morph into a splat */
+  tl.to(path, { scaleY: 0.62, transformOrigin: '50% 100%', duration: 0.09, ease: 'power1.out' }, 0.87);
+  tl.to(path, { scaleY: 1, duration: 0.5, ease: 'elastic.out(1.2, 0.4)' }, 0.96);
+  tl.to(mm, { t: 1, duration: 0.9, ease: 'elastic.out(1, 0.42)',
+    onUpdate: function () {
+      var tmp = new Float32Array(M * 2);
+      MORPH.mix(circlePts, splatPts, mm.t, tmp);
+      path.setAttribute('d', MORPH.toPath(tmp));
+    } }, 0.94);
+  /* dip to ink, then reveal the atelier */
+  tl.to(path, { scale: 48, transformOrigin: '50% 50%', duration: 0.75, ease: 'power3.in' }, 1.75);
+  tl.to(veil, { opacity: 0, duration: 0.55, ease: 'power2.out', onComplete: finish }, 2.42);
+  tl.to('#vline, #count', { opacity: 0, duration: 0.3 }, 1.7);
+}
+
+/* ==================================================================
+   MASTER LOOP
+   ================================================================== */
+var mN = document.getElementById('m-n');
+var mEng = document.getElementById('m-eng');
+mN.textContent = INK.count.toLocaleString();
+mEng.textContent = INK.gpu ? 'gpu' : 'cpu';
+
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(function () { try { INK.rebakeType(); } catch (e) {} });
+}
+
+var lastT = performance.now();
+function loop(now) {
+  requestAnimationFrame(loop);
+  var dt = clamp((now - lastT) / 1000, 0.001, 0.05);
+  lastT = now;
+  var t = now / 1000;
+
+  /* lenis-flavoured smoothing of scroll velocity */
+  var y = window.scrollY || 0;
+  scrollV.raw = (y - scrollV.last) / Math.max(dt, 0.001);
+  scrollV.last = y;
+  scrollV.s = lerp(scrollV.s, scrollV.raw, 1 - Math.pow(0.0015, dt));
+
+  /* pointer velocity in sim units */
+  if (PTR.sx > 90) { PTR.sx = PTR.x; PTR.sy = PTR.y; }
+  var nvx = (PTR.x - PTR.sx) / dt, nvy = (PTR.y - PTR.sy) / dt;
+  PTR.sx = PTR.x; PTR.sy = PTR.y;
+  PTR.pvx = clamp(lerp(PTR.pvx, nvx, 0.5), -9, 9);
+  PTR.pvy = clamp(lerp(PTR.pvy, nvy, 0.5), -9, 9);
+  INK.pointer(PTR.x, PTR.y, PTR.pvx, PTR.pvy);
+
+  /* hero owns the formation strength while pinned */
+  if (heroActive && HAS_ST) {
+    INK.U.form = bootF.v * heroFall(heroPr.v);
+  } else if (!HAS_ST && machine.state === 'live' && (window.scrollY || 0) < innerHeight * 0.6) {
+    INK.U.form = bootF.v;
+  }
+
+  if (!document.hidden) INK.step(dt, t);
+  LIQ.step(t, dt);
+  if (SOFT) SOFT.step(dt * 1000);
+  ROPE.step(dt, t);
+  if (CUR) CUR.frame(dt);
+}
+
+var rsT = null;
+window.addEventListener('resize', function () {
+  clearTimeout(rsT);
+  rsT = setTimeout(function () {
+    INK.resize();
+    if (SOFT) SOFT.resize();
+    ROPE.resize();
+    if (HAS_ST) ScrollTrigger.refresh();
+  }, 180);
+});
+document.addEventListener('visibilitychange', function () { lastT = performance.now(); });
+
+requestAnimationFrame(loop);
+runVeil();
+
+})();
+</script>
+</body>
+</html>
