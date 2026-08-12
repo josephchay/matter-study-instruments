@@ -1,4 +1,4 @@
-# Standalone Animation Effects
+# Matter Study Instruments
 
 ## Acknowledgements
 
