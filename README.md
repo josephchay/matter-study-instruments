@@ -6,7 +6,7 @@
 
 ### AI Prompt Scripts
 
-#### Fable 5
+#### Fable 5 (Claude AI)
 
 - Design and develop interactive and innovative particle animation system with animation packages like animejs, xstate, gsap, webgl, threejs, framer motion, three, matter js, flubber, lenis, and other animation libraries or packages, with animation effects like morphical, starchy, fluid, bouncy, jelly, elastic, stretchy, weightier, liquid, distortion, shaders, easing, springs, with sample systems like physics, mathematics, innovative with using sample styles like Awwwards 
     - <a href="https://claude.ai/chat/c9362264-14a1-45ac-bcc1-9dbec32dd57d" target="_blank">Particle Forge</a>
